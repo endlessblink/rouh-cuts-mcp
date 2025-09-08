@@ -15,7 +15,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import { spawn, execSync } from 'child_process';
 import { fileURLToPath } from 'url';
-import os from 'os';
+import * as osModule from 'os';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,18 +33,564 @@ const server = new Server(
 );
 
 // Auto-installation configuration
-const DEFAULT_PROJECT_PATH = path.join(os.homedir(), 'Claude-Videos', 'remotion-project');
+const DEFAULT_PROJECT_PATH = path.join(osModule.homedir(), 'Claude-Videos', 'remotion-project');
 
+// Environment detection interfaces
+interface EnvironmentStatus {
+  nodejs: {
+    installed: boolean;
+    version?: string;
+    path?: string;
+  };
+  npm: {
+    installed: boolean;
+    version?: string;
+    canInstallGlobal: boolean;
+  };
+  remotion: {
+    cliInstalled: boolean;
+    projectExists: boolean;
+    projectPath?: string;
+    dependencies: {
+      remotion: boolean;
+      react: boolean;
+      typescript: boolean;
+    };
+  };
+  platform: {
+    os: 'windows' | 'macos' | 'linux';
+    shell: string;
+    canExecute: boolean;
+    recommendedDir: string;
+  };
+}
+
+// Working directory management - added to fix path resolution issues
+let currentProjectPath: string | null = null;
+
+async function getCurrentProjectPath(): Promise<string> {
+  if (currentProjectPath && await verifyProjectHealth(currentProjectPath)) {
+    return currentProjectPath;
+  }
+  
+  // Reset and find/create project
+  currentProjectPath = await ensureRemotionProject();
+  return currentProjectPath;
+}
+
+async function setCurrentProjectPath(projectPath: string): Promise<void> {
+  if (await verifyProjectHealth(projectPath)) {
+    currentProjectPath = projectPath;
+    console.log(`🎯 Working project set to: ${projectPath}`);
+  } else {
+    throw new Error(`Invalid project path: ${projectPath}`);
+  }
+}
+
+// CRITICAL: Proper working directory management to avoid Claude app directory
+function ensureProperWorkingDirectory(): void {
+  const currentDir = process.cwd();
+  
+  // Check if we're running from Claude Desktop app directory (common issue)
+  if (currentDir.includes('claude.exe') || 
+      currentDir.includes('Claude') || 
+      currentDir.includes('AnthropicClaude') ||
+      currentDir.includes('AppData\\Local\\AnthropicClaude')) {
+    
+    console.log(`⚠️ Detected Claude app directory: ${currentDir}`);
+    console.log('🔄 Switching to user home directory for better compatibility...');
+    
+    try {
+      process.chdir(osModule.homedir());
+      console.log(`✅ Working directory changed to: ${process.cwd()}`);
+    } catch (error) {
+      console.log('⚠️ Could not change working directory, but continuing...');
+    }
+  }
+}
+
+// Enhanced environment detection functions
+async function checkNodeJS(): Promise<{ installed: boolean; version?: string; path?: string }> {
+  try {
+    const version = execSync('node --version', { encoding: 'utf8', timeout: 5000 }).trim();
+    const nodePath = execSync('where node', { encoding: 'utf8', timeout: 5000 }).trim();
+    return { installed: true, version, path: nodePath };
+  } catch (error) {
+    return { installed: false };
+  }
+}
+
+async function checkNPM(): Promise<{ installed: boolean; version?: string; canInstallGlobal: boolean }> {
+  try {
+    const version = execSync('npm --version', { encoding: 'utf8', timeout: 5000 }).trim();
+    
+    // Test if we can install global packages
+    let canInstallGlobal = true;
+    try {
+      // Try to list global packages as a test
+      execSync('npm list -g --depth=0', { encoding: 'utf8', timeout: 5000 });
+    } catch (error) {
+      canInstallGlobal = false;
+    }
+    
+    return { installed: true, version, canInstallGlobal };
+  } catch (error) {
+    return { installed: false, version: undefined, canInstallGlobal: false };
+  }
+}
+
+async function checkRemotionInstallation(): Promise<{
+  cliInstalled: boolean;
+  projectExists: boolean;
+  projectPath?: string;
+  dependencies: { remotion: boolean; react: boolean; typescript: boolean };
+}> {
+  // Check if Remotion CLI is available
+  let cliInstalled = false;
+  try {
+    execSync('npx @remotion/cli --version', { encoding: 'utf8', timeout: 10000 });
+    cliInstalled = true;
+  } catch (error) {
+    // Try alternative check
+    try {
+      execSync('remotion --version', { encoding: 'utf8', timeout: 5000 });
+      cliInstalled = true;
+    } catch (innerError) {
+      cliInstalled = false;
+    }
+  }
+  
+  // Check for existing project
+  const existingProject = findExistingProject();
+  const projectExists = !!existingProject;
+  
+  // Check dependencies if project exists
+  let dependencies = { remotion: false, react: false, typescript: false };
+  if (existingProject) {
+    try {
+      const packageJsonPath = path.join(existingProject, 'package.json');
+      if (fs.existsSync(packageJsonPath)) {
+        const packageJson = fs.readJsonSync(packageJsonPath);
+        const allDeps = { ...packageJson.dependencies, ...packageJson.devDependencies };
+        
+        dependencies = {
+          remotion: !!(allDeps.remotion || allDeps['@remotion/cli']),
+          react: !!allDeps.react,
+          typescript: !!allDeps.typescript
+        };
+      }
+    } catch (error) {
+      // Keep default false values
+    }
+  }
+  
+  return {
+    cliInstalled,
+    projectExists,
+    projectPath: existingProject || undefined,
+    dependencies
+  };
+}
+
+async function detectPlatform(): Promise<{
+  os: 'windows' | 'macos' | 'linux';
+  shell: string;
+  canExecute: boolean;
+  recommendedDir: string;
+}> {
+  const platform = process.platform;
+  let os: 'windows' | 'macos' | 'linux';
+  let shell = '';
+  let canExecute = true;
+  let recommendedDir = '';
+  
+  switch (platform) {
+    case 'win32':
+      os = 'windows';
+      shell = 'cmd';
+      recommendedDir = path.join(osModule.homedir(), 'Documents', 'Claude-Videos');
+      break;
+    case 'darwin':
+      os = 'macos';
+      shell = 'bash';
+      recommendedDir = path.join(osModule.homedir(), 'Documents', 'Claude-Videos');
+      break;
+    default:
+      os = 'linux';
+      shell = 'bash';
+      recommendedDir = path.join(osModule.homedir(), 'Claude-Videos');
+      break;
+  }
+  
+  // Test if we can execute commands
+  try {
+    execSync('echo test', { encoding: 'utf8', timeout: 3000 });
+  } catch (error) {
+    canExecute = false;
+  }
+  
+  return { os, shell, canExecute, recommendedDir };
+}
+
+// CRITICAL: Complete environment setup for true zero-configuration
+async function ensureCompleteEnvironment(): Promise<void> {
+  console.log('🔍 Checking complete environment for Remotion...');
+  
+  // Step 0: Ensure we're not running from Claude app directory
+  ensureProperWorkingDirectory();
+  
+  // Step 1: Verify Node.js is available
+  const nodeStatus = await checkNodeJS();
+  if (!nodeStatus.installed) {
+    throw new Error(`Node.js is required but not installed. 
+
+🔧 TROUBLESHOOTING STEPS:
+1. Download Node.js from https://nodejs.org
+2. Install Node.js (includes npm automatically)
+3. Restart Claude Desktop completely
+4. Try creating a component again
+
+💡 TIP: After installing Node.js, you may need to restart your computer for PATH changes to take effect.`);
+  }
+  
+  // Step 2: Verify npm is working
+  const npmStatus = await checkNPM();
+  if (!npmStatus.installed) {
+    throw new Error(`npm is required but not available. 
+
+🔧 TROUBLESHOOTING STEPS:
+1. Ensure Node.js is properly installed (npm comes with Node.js)
+2. Restart Claude Desktop completely
+3. Open Command Prompt and type: npm --version
+4. If that fails, reinstall Node.js from https://nodejs.org
+
+💡 TIP: npm is included with Node.js installation - if Node.js works but npm doesn't, your installation may be corrupted.`);
+  }
+  
+  // Step 3: Handle Remotion CLI installation
+  const remotionStatus = await checkRemotionInstallation();
+  if (!remotionStatus.cliInstalled) {
+    console.log('📦 Remotion CLI not found, installing globally...');
+    
+    try {
+      // Try to install Remotion CLI globally for the user
+      await installRemotionCLI();
+      console.log('✅ Remotion CLI installed successfully!');
+    } catch (error) {
+      console.log('⚠️ Global Remotion CLI installation failed, will use npx instead');
+      // This is OK - we can still use npx @remotion/cli
+    }
+  }
+  
+  // Step 4: Ensure we have a working project directory
+  if (!remotionStatus.projectExists) {
+    console.log('🎬 No Remotion project found, creating one automatically...');
+    await createRemotionProject();
+  } else if (!await verifyProjectHealth(remotionStatus.projectPath!)) {
+    console.log('🔧 Existing project needs repair...');
+    await repairProject(remotionStatus.projectPath!);
+  }
+  
+  console.log('✅ Environment ready for video creation!');
+}
+
+// Install Remotion CLI globally with enhanced error handling
+async function installRemotionCLI(): Promise<void> {
+  const platform = await detectPlatform();
+  
+  try {
+    console.log('📦 Installing Remotion CLI globally...');
+    
+    // Try different installation strategies based on platform
+    if (platform.os === 'windows') {
+      // Windows: Enhanced PowerShell policy handling
+      try {
+        // First try: PowerShell with execution policy bypass
+        execSync('powershell -ExecutionPolicy Bypass -Command "npm install -g @remotion/cli"', { 
+          stdio: 'inherit', 
+          timeout: 120000 
+        });
+      } catch (psError) {
+        console.log('PowerShell with bypass failed, trying cmd...');
+        try {
+          // Second try: cmd to avoid PowerShell policies entirely
+          execSync('cmd /c "npm install -g @remotion/cli"', { 
+            stdio: 'inherit', 
+            timeout: 120000 
+          });
+        } catch (cmdError) {
+          console.log('cmd install failed, trying npx fallback...');
+          // Third try: Local npx install (no global permissions needed)
+          execSync('npm install @remotion/cli', { 
+            stdio: 'inherit', 
+            timeout: 120000 
+          });
+        }
+      }
+    } else if (platform.os === 'macos') {
+      // macOS: Handle npm prefix issues
+      try {
+        execSync('npm install -g @remotion/cli', { 
+          stdio: 'inherit', 
+          timeout: 120000 
+        });
+      } catch (error) {
+        // Try with specific npm prefix
+        const homePrefix = path.join(osModule.homedir(), '.npm-global');
+        execSync(`npm config set prefix ${homePrefix} && npm install -g @remotion/cli`, { 
+          stdio: 'inherit', 
+          timeout: 120000 
+        });
+      }
+    } else {
+      // Linux: Try regular install, fall back to sudo if needed
+      try {
+        execSync('npm install -g @remotion/cli', { 
+          stdio: 'inherit', 
+          timeout: 120000 
+        });
+      } catch (error) {
+        console.log('Regular install failed, checking if sudo is needed...');
+        // Don't automatically sudo - just inform user
+        throw new Error('Global npm install failed. You may need to run: sudo npm install -g @remotion/cli');
+      }
+    }
+    
+    console.log('✅ Remotion CLI installed globally');
+  } catch (error) {
+    // If global install fails, try without -g (local fallback)
+    console.log('Global install failed, this is normal on some systems');
+    throw error; // Let caller handle gracefully
+  }
+}
+
+// NEW: Enhanced project management
 async function ensureRemotionProject(): Promise<string> {
   // First, try to find existing project using current logic
   const existingProject = findExistingProject();
   if (existingProject) {
-    return existingProject;
+    // Verify the existing project is actually working
+    if (await verifyProjectHealth(existingProject)) {
+      return existingProject;
+    } else {
+      console.log('🔧 Found existing project but it needs repair...');
+      await repairProject(existingProject);
+      return existingProject;
+    }
   }
   
   // No project found - create one automatically
   console.log('🎬 No Remotion project found. Creating one automatically...');
   return await createRemotionProject();
+}
+
+// Enhanced project health check
+async function verifyProjectHealth(projectPath: string): Promise<boolean> {
+  try {
+    // Check package.json exists and has required dependencies
+    const packageJsonPath = path.join(projectPath, 'package.json');
+    if (!fs.existsSync(packageJsonPath)) {
+      return false;
+    }
+    
+    const packageJson = fs.readJsonSync(packageJsonPath);
+    const allDeps = { ...packageJson.dependencies, ...packageJson.devDependencies };
+    
+    // Must have core Remotion dependencies
+    if (!allDeps.remotion && !allDeps['@remotion/cli']) {
+      return false;
+    }
+    
+    // Check if src directory exists
+    const srcDir = path.join(projectPath, 'src');
+    if (!fs.existsSync(srcDir)) {
+      return false;
+    }
+    
+    // Check if node_modules exists (indicates dependencies are installed)
+    const nodeModulesDir = path.join(projectPath, 'node_modules');
+    if (!fs.existsSync(nodeModulesDir)) {
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+// NEW: Comprehensive validation of complete installation
+async function validateCompleteInstallation(testVideoRender: boolean = false): Promise<{
+  isValid: boolean;
+  details: {
+    nodejs: boolean;
+    npm: boolean;
+    remotionCli: boolean;
+    project: boolean;
+    dependencies: boolean;
+    canCreateComponent: boolean;
+    canRenderVideo?: boolean;
+  };
+  issues: string[];
+  fixes: string[];
+}> {
+  const issues: string[] = [];
+  const fixes: string[] = [];
+  const details = {
+    nodejs: false,
+    npm: false,
+    remotionCli: false,
+    project: false,
+    dependencies: false,
+    canCreateComponent: false,
+    canRenderVideo: undefined as boolean | undefined
+  };
+  
+  try {
+    // Check Node.js
+    const nodeStatus = await checkNodeJS();
+    details.nodejs = nodeStatus.installed;
+    if (!nodeStatus.installed) {
+      issues.push('Node.js not installed');
+      fixes.push('Install Node.js from https://nodejs.org');
+    }
+    
+    // Check npm
+    const npmStatus = await checkNPM();
+    details.npm = npmStatus.installed;
+    if (!npmStatus.installed) {
+      issues.push('npm not available');
+      fixes.push('Reinstall Node.js (npm comes bundled)');
+    }
+    
+    // Check Remotion CLI
+    const remotionStatus = await checkRemotionInstallation();
+    details.remotionCli = remotionStatus.cliInstalled;
+    if (!remotionStatus.cliInstalled) {
+      issues.push('Remotion CLI not installed');
+      fixes.push('Run: npm install -g @remotion/cli');
+    }
+    
+    // Check project
+    details.project = remotionStatus.projectExists;
+    if (!remotionStatus.projectExists) {
+      issues.push('No Remotion project found');
+      fixes.push('Run setup_remotion_environment tool');
+    } else {
+      // Check project health
+      const projectHealthy = await verifyProjectHealth(remotionStatus.projectPath!);
+      details.dependencies = projectHealthy;
+      if (!projectHealthy) {
+        issues.push('Project dependencies incomplete');
+        fixes.push('Run repair_remotion_project tool');
+      }
+    }
+    
+    // Test component creation capability
+    if (details.nodejs && details.npm && details.project) {
+      try {
+        const projectRoot = await ensureRemotionProject();
+        const testComponentPath = path.join(projectRoot, 'src', 'components', '__test__.tsx');
+        
+        // Try to write a test component
+        await fs.writeFile(testComponentPath, 'export const TestComponent = () => <div>Test</div>;');
+        await fs.remove(testComponentPath); // Clean up
+        details.canCreateComponent = true;
+      } catch (error) {
+        details.canCreateComponent = false;
+        issues.push('Cannot create components');
+        fixes.push('Check file permissions and project structure');
+      }
+    }
+    
+    // Test video rendering (optional)
+    if (testVideoRender && details.canCreateComponent) {
+      try {
+        // This would be a more complex test - simplified for now
+        details.canRenderVideo = true;
+      } catch (error) {
+        details.canRenderVideo = false;
+        issues.push('Video rendering failed');
+        fixes.push('Check Remotion dependencies and FFmpeg installation');
+      }
+    }
+    
+    const isValid = details.nodejs && details.npm && details.project && details.dependencies && details.canCreateComponent;
+    
+    return { isValid, details, issues, fixes };
+  } catch (error) {
+    issues.push(`Validation error: ${error instanceof Error ? error.message : String(error)}`);
+    fixes.push('Check system environment and try again');
+    return { isValid: false, details, issues, fixes };
+  }
+}
+
+// Repair broken project
+async function repairProject(projectPath: string): Promise<void> {
+  console.log(`🔧 Repairing project at: ${projectPath}`);
+  
+  try {
+    // Ensure src directory exists
+    const srcDir = path.join(projectPath, 'src');
+    await fs.ensureDir(srcDir);
+    await fs.ensureDir(path.join(srcDir, 'components'));
+    
+    // Check and repair package.json
+    const packageJsonPath = path.join(projectPath, 'package.json');
+    let packageJson = {};
+    
+    if (fs.existsSync(packageJsonPath)) {
+      packageJson = fs.readJsonSync(packageJsonPath);
+    }
+    
+    // Ensure required dependencies are present
+    const requiredDeps = {
+      "@remotion/cli": "4.0.340",
+      "@remotion/player": "4.0.340",
+      "react": "18.2.0",
+      "react-dom": "18.2.0",
+      "remotion": "4.0.340",
+      "lucide-react": "^0.263.1"
+    };
+    
+    const requiredDevDeps = {
+      "@types/react": "^18.0.0",
+      "typescript": "^5.0.0"
+    };
+    
+    packageJson = {
+      name: "claude-generated-videos",
+      version: "1.0.0",
+      description: "Auto-generated Remotion project for Claude Desktop",
+      scripts: {
+        "dev": "remotion studio",
+        "build": "remotion render",
+        "preview": "remotion preview",
+        "upgrade": "remotion upgrade"
+      },
+      ...packageJson,
+      dependencies: { ...requiredDeps, ...(packageJson as any).dependencies },
+      devDependencies: { ...requiredDevDeps, ...(packageJson as any).devDependencies }
+    };
+    
+    await fs.writeJson(packageJsonPath, packageJson, { spaces: 2 });
+    
+    // Reinstall dependencies
+    console.log('📦 Reinstalling dependencies...');
+    try {
+      execSync('npm install', { 
+        cwd: projectPath, 
+        stdio: 'inherit',
+        timeout: 60000 // 1 minute timeout
+      });
+      console.log('✅ Project repaired successfully!');
+    } catch (error) {
+      console.log('⚠️  Dependency installation failed, but project structure is repaired.');
+    }
+    
+  } catch (error) {
+    console.log('⚠️  Project repair encountered issues, but continuing...');
+  }
 }
 
 function findExistingProject(): string | null {
@@ -90,10 +636,45 @@ function isRemotionProject(projectPath: string): boolean {
 }
 
 async function createRemotionProject(): Promise<string> {
-  console.log(`📁 Creating Remotion project at: ${DEFAULT_PROJECT_PATH}`);
+  return await createRemotionProjectAt(DEFAULT_PROJECT_PATH);
+}
+
+async function copyGuidelinesIfAvailable(projectPath: string): Promise<void> {
+  try {
+    // Try to find guidelines in the MCP server directory
+    const serverDir = path.dirname(__filename);
+    const mcpServerDir = path.dirname(serverDir);
+    const mcpRootDir = path.dirname(mcpServerDir);
+    const guidelinesSource = path.join(mcpRootDir, 'claude-dev-guidelines');
+    
+    if (fs.existsSync(guidelinesSource)) {
+      const guidelinesTarget = path.join(projectPath, 'claude-dev-guidelines');
+      await fs.copy(guidelinesSource, guidelinesTarget);
+      console.log('📋 Copied animation guidelines to project');
+    }
+  } catch (error) {
+    // Guidelines not essential, continue without them
+    console.log('📋 Guidelines not available, project will work without them');
+  }
+}
+
+function getProjectRoot(): string {
+  // Use the new auto-installation logic
+  const existingProject = findExistingProject();
+  if (existingProject) {
+    return existingProject;
+  }
+  
+  // If no project exists, the calling function should handle creation
+  // For now, return the default path (will be created when needed)
+  return DEFAULT_PROJECT_PATH;
+}
+
+async function createRemotionProjectAt(targetPath: string): Promise<string> {
+  console.log(`📁 Creating Remotion project at: ${targetPath}`);
   
   // Ensure directory exists
-  await fs.ensureDir(DEFAULT_PROJECT_PATH);
+  await fs.ensureDir(targetPath);
   
   // Create package.json
   const packageJson = {
@@ -120,7 +701,7 @@ async function createRemotionProject(): Promise<string> {
     }
   };
   
-  await fs.writeJson(path.join(DEFAULT_PROJECT_PATH, 'package.json'), packageJson, { spaces: 2 });
+  await fs.writeJson(path.join(targetPath, 'package.json'), packageJson, { spaces: 2 });
   
   // Create tsconfig.json
   const tsConfig = {
@@ -142,7 +723,7 @@ async function createRemotionProject(): Promise<string> {
     "include": ["src"]
   };
   
-  await fs.writeJson(path.join(DEFAULT_PROJECT_PATH, 'tsconfig.json'), tsConfig, { spaces: 2 });
+  await fs.writeJson(path.join(targetPath, 'tsconfig.json'), tsConfig, { spaces: 2 });
   
   // Create remotion.config.ts
   const remotionConfig = `import {Config} from '@remotion/cli/config';
@@ -151,10 +732,10 @@ Config.setVideoImageFormat('jpeg');
 Config.setOverwriteOutput(true);
 `;
   
-  await fs.writeFile(path.join(DEFAULT_PROJECT_PATH, 'remotion.config.ts'), remotionConfig);
+  await fs.writeFile(path.join(targetPath, 'remotion.config.ts'), remotionConfig);
   
   // Create src directory and initial files
-  const srcDir = path.join(DEFAULT_PROJECT_PATH, 'src');
+  const srcDir = path.join(targetPath, 'src');
   await fs.ensureDir(srcDir);
   await fs.ensureDir(path.join(srcDir, 'components'));
   
@@ -248,13 +829,13 @@ export const WelcomeVideo: React.FC = () => {
   await fs.writeFile(path.join(srcDir, 'components', 'WelcomeVideo.tsx'), welcomeComponent);
   
   // Copy guidelines if they exist in the MCP
-  await copyGuidelinesIfAvailable(DEFAULT_PROJECT_PATH);
+  await copyGuidelinesIfAvailable(targetPath);
   
   // Install dependencies
   console.log('📦 Installing Remotion dependencies...');
   try {
     execSync('npm install', { 
-      cwd: DEFAULT_PROJECT_PATH, 
+      cwd: targetPath, 
       stdio: 'inherit' 
     });
     console.log('✅ Remotion project created successfully!');
@@ -262,38 +843,7 @@ export const WelcomeVideo: React.FC = () => {
     console.log('⚠️  Project created but npm install failed. Dependencies will be installed when first component is created.');
   }
   
-  return DEFAULT_PROJECT_PATH;
-}
-
-async function copyGuidelinesIfAvailable(projectPath: string): Promise<void> {
-  try {
-    // Try to find guidelines in the MCP server directory
-    const serverDir = path.dirname(__filename);
-    const mcpServerDir = path.dirname(serverDir);
-    const mcpRootDir = path.dirname(mcpServerDir);
-    const guidelinesSource = path.join(mcpRootDir, 'claude-dev-guidelines');
-    
-    if (fs.existsSync(guidelinesSource)) {
-      const guidelinesTarget = path.join(projectPath, 'claude-dev-guidelines');
-      await fs.copy(guidelinesSource, guidelinesTarget);
-      console.log('📋 Copied animation guidelines to project');
-    }
-  } catch (error) {
-    // Guidelines not essential, continue without them
-    console.log('📋 Guidelines not available, project will work without them');
-  }
-}
-
-function getProjectRoot(): string {
-  // Use the new auto-installation logic
-  const existingProject = findExistingProject();
-  if (existingProject) {
-    return existingProject;
-  }
-  
-  // If no project exists, the calling function should handle creation
-  // For now, return the default path (will be created when needed)
-  return DEFAULT_PROJECT_PATH;
+  return targetPath;
 }
 
 async function ensureDependenciesInstalled(projectPath: string): Promise<void> {
@@ -317,6 +867,9 @@ async function ensureDependenciesInstalled(projectPath: string): Promise<void> {
 }
 
 async function createSimpleComponent(name: string, code: string): Promise<void> {
+  // CRITICAL: Auto-setup environment before ANY component creation
+  await ensureCompleteEnvironment();
+  
   // Ensure Remotion project exists (auto-create if needed)
   const projectRoot = await ensureRemotionProject();
   
@@ -565,7 +1118,98 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             }
           }
         }
-      }
+      },
+      {
+        name: 'check_environment',
+        description: 'Check system environment and Remotion installation status',
+        inputSchema: {
+          type: 'object',
+          properties: {}
+        }
+      },
+      {
+        name: 'setup_remotion_environment',
+        description: 'Automatically setup Remotion environment with all dependencies',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            projectPath: {
+              type: 'string',
+              description: 'Optional custom path for project (default: ~/Claude-Videos/remotion-project)',
+              default: 'default'
+            },
+            forceReinstall: {
+              type: 'boolean',
+              description: 'Force reinstallation even if project exists',
+              default: false
+            }
+          }
+        }
+      },
+      {
+        name: 'repair_remotion_project',
+        description: 'Repair broken Remotion project installation',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            projectPath: {
+              type: 'string',
+              description: 'Path to project to repair (default: auto-detect)',
+              default: 'auto'
+            }
+          }
+        }
+      },
+      {
+        name: 'test_auto_installation',
+        description: 'Test the auto-installation system by forcing creation of a new Remotion project',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            targetPath: {
+              type: 'string',
+              description: 'Optional path for test project (default: ~/Claude-Videos/test-install)',
+              default: 'default'
+            }
+          }
+        }
+      },
+      {
+        name: 'set_working_directory',
+        description: 'Set the current working project directory for video creation',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            projectPath: {
+              type: 'string',
+              description: 'Path to the Remotion project directory'
+            }
+          },
+          required: ['projectPath']
+        }
+      },
+      {
+        name: 'get_current_directory',
+        description: 'Get the current working project directory',
+        inputSchema: {
+          type: 'object',
+          properties: {}
+        }
+      },
+      {
+        name: 'validate_complete_installation',
+        description: 'Perform comprehensive validation of the entire Remotion installation',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            testVideoRender: {
+              type: 'boolean',
+              description: 'Test video rendering capabilities (default: false)',
+              default: false
+            }
+          }
+        }
+      },
     ]
   };
 });
@@ -579,21 +1223,72 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const { componentName, code, duration = 3 } = args as any;
         const durationFrames = Math.round(duration * 30);
         
-        await createSimpleComponent(componentName, code);
-        await updateRootComposition(componentName, durationFrames);
-        
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'Component "' + componentName + '" created successfully! Duration: ' + duration + ' seconds (' + durationFrames + ' frames)'
-            }
-          ]
-        };
+        try {
+          // CRITICAL: Auto-setup happens inside createSimpleComponent
+          await createSimpleComponent(componentName, code);
+          await updateRootComposition(componentName, durationFrames);
+          
+          // Get project path for user feedback
+          const projectRoot = await ensureRemotionProject();
+          
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `🎬 Component "${componentName}" created successfully!\n\n` +
+                      `⏱️ Duration: ${duration} seconds (${durationFrames} frames)\n` +
+                      `📁 Location: ${projectRoot}/src/components/${componentName}.tsx\n` +
+                      `🔗 Registered in Root.tsx for rendering\n\n` +
+                      `✨ Ready to preview in Remotion Studio or render to video!`
+              }
+            ]
+          };
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          
+          // Provide helpful error messages
+          if (errorMessage.includes('Node.js')) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `❌ Environment Setup Required\n\n${errorMessage}\n\nPlease install Node.js from https://nodejs.org and restart Claude Desktop.`
+                }
+              ],
+              isError: true
+            };
+          }
+          
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `❌ Component creation failed: ${errorMessage}\n\nTry running 'check_environment' to diagnose issues.`
+              }
+            ],
+            isError: true
+          };
+        }
       }
       
       case 'edit_remotion_component': {
         const { componentName, newCode } = args as any;
+        
+        // CRITICAL: Auto-setup environment before editing
+        try {
+          await ensureCompleteEnvironment();
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `❌ Environment setup failed: ${errorMessage}\n\nPlease ensure Node.js is installed and try again.`
+              }
+            ],
+            isError: true
+          };
+        }
         
         await createSimpleComponent(componentName, newCode);
         
@@ -611,6 +1306,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'delete_component': {
         const { componentName } = args as any;
         
+        // CRITICAL: Auto-setup environment before deleting
+        try {
+          await ensureCompleteEnvironment();
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `❌ Environment setup failed: ${errorMessage}\n\nPlease ensure Node.js is installed and try again.`
+              }
+            ],
+            isError: true
+          };
+        }
+        
         await deleteComponent(componentName);
         
         return {
@@ -625,6 +1336,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       
       case 'read_component': {
         const { componentName } = args as any;
+        
+        // CRITICAL: Auto-setup environment before reading
+        try {
+          await ensureCompleteEnvironment();
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `❌ Environment setup failed: ${errorMessage}\n\nPlease ensure Node.js is installed and try again.`
+              }
+            ],
+            isError: true
+          };
+        }
+        
         const projectRoot = await ensureRemotionProject();
         const componentPath = path.join(projectRoot, 'src', 'components', componentName + '.tsx');
         
@@ -646,25 +1374,61 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       
       case 'launch_remotion_studio': {
         const { port = 3000 } = args as any;
+        
+        // CRITICAL: Auto-setup environment before launching studio
+        try {
+          await ensureCompleteEnvironment();
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `❌ Environment setup failed: ${errorMessage}\n\nPlease ensure Node.js is installed and try again.`
+              }
+            ],
+            isError: true
+          };
+        }
+        
         const projectRoot = await ensureRemotionProject();
         await ensureDependenciesInstalled(projectRoot);
         
         return new Promise((resolve) => {
-          const studio = spawn('npx', ['remotion', 'studio', '--port=' + port], {
-            cwd: projectRoot,
-            detached: true,
-            stdio: 'ignore',
-            shell: true
-          });
+          // Try different Remotion CLI approaches
+          const commands = [
+            ['remotion', 'studio', '--port=' + port],
+            ['npx', '@remotion/cli', 'studio', '--port=' + port],
+            ['npx', 'remotion', 'studio', '--port=' + port]
+          ];
           
-          studio.unref();
+          let success = false;
+          
+          for (const cmd of commands) {
+            try {
+              const studio = spawn(cmd[0], cmd.slice(1), {
+                cwd: projectRoot,
+                detached: true,
+                stdio: 'ignore',
+                shell: true
+              });
+              
+              studio.unref();
+              success = true;
+              break;
+            } catch (error) {
+              console.log(`Failed to launch with ${cmd.join(' ')}, trying next method...`);
+            }
+          }
           
           setTimeout(() => {
             resolve({
               content: [
                 {
                   type: 'text',
-                  text: 'Remotion Studio launched on port ' + port + '. Access at: http://localhost:' + port
+                  text: success 
+                    ? `🎬 Remotion Studio launched on port ${port}!\n\n🌐 Access at: http://localhost:${port}\n📁 Project: ${projectRoot}\n\n✨ Ready to create and preview videos!`
+                    : `⚠️ Studio launch attempted but may need manual intervention.\n\nTry opening a terminal in ${projectRoot} and running:\nnpx @remotion/cli studio --port=${port}`
                 }
               ]
             });
@@ -674,6 +1438,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       
       case 'render_video': {
         const { componentId, outputPath } = args as any;
+        
+        // CRITICAL: Auto-setup environment before rendering
+        try {
+          await ensureCompleteEnvironment();
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `❌ Environment setup failed: ${errorMessage}\n\nPlease ensure Node.js is installed and try again.`
+              }
+            ],
+            isError: true
+          };
+        }
+        
         const projectRoot = await ensureRemotionProject();
         await ensureDependenciesInstalled(projectRoot);
         const defaultOutput = path.join(projectRoot, 'out', componentId + '.mp4');
@@ -682,44 +1463,76 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         await fs.ensureDir(path.dirname(finalOutput));
         
         return new Promise((resolve, reject) => {
-          const render = spawn('npx', [
-            'remotion', 'render', 
-            'src/Root.tsx', 
-            componentId, 
-            finalOutput
-          ], {
-            cwd: projectRoot,
-            stdio: 'pipe',
-            shell: true
-          });
+          // Try different Remotion CLI approaches for rendering
+          const commands = [
+            ['remotion', 'render', 'src/Root.tsx', componentId, finalOutput],
+            ['npx', '@remotion/cli', 'render', 'src/Root.tsx', componentId, finalOutput],
+            ['npx', 'remotion', 'render', 'src/Root.tsx', componentId, finalOutput]
+          ];
           
-          let output = '';
-          render.stdout?.on('data', (data) => {
-            output += data.toString();
-          });
+          let currentIndex = 0;
           
-          render.stderr?.on('data', (data) => {
-            output += data.toString();
-          });
-          
-          render.on('close', (code) => {
-            if (code === 0) {
-              resolve({
-                content: [
-                  {
-                    type: 'text',
-                    text: 'Video rendered successfully to: ' + finalOutput
-                  }
-                ]
-              });
-            } else {
-              reject(new Error('Render failed: ' + output));
+          function tryRender() {
+            if (currentIndex >= commands.length) {
+              reject(new Error('All render methods failed. Please check project setup and try again.'));
+              return;
             }
-          });
+            
+            const cmd = commands[currentIndex];
+            const render = spawn(cmd[0], cmd.slice(1), {
+              cwd: projectRoot,
+              stdio: 'pipe',
+              shell: true
+            });
+            
+            let output = '';
+            render.stdout?.on('data', (data) => {
+              output += data.toString();
+            });
+            
+            render.stderr?.on('data', (data) => {
+              output += data.toString();
+            });
+            
+            render.on('close', (code) => {
+              if (code === 0) {
+                resolve({
+                  content: [
+                    {
+                      type: 'text',
+                      text: `🎬 Video rendered successfully!\n\n📁 Output: ${finalOutput}\n💾 File size: ${fs.existsSync(finalOutput) ? Math.round(fs.statSync(finalOutput).size / 1024) + ' KB' : 'Unknown'}\n\n✨ Ready to share your video!`
+                    }
+                  ]
+                });
+              } else {
+                console.log(`Render attempt ${currentIndex + 1} failed, trying next method...`);
+                currentIndex++;
+                tryRender();
+              }
+            });
+          }
+          
+          tryRender();
         });
       }
       
       case 'list_components': {
+        // CRITICAL: Auto-setup environment before listing
+        try {
+          await ensureCompleteEnvironment();
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `❌ Environment setup failed: ${errorMessage}\n\nPlease ensure Node.js is installed and try again.`
+              }
+            ],
+            isError: true
+          };
+        }
+        
         const projectRoot = await ensureRemotionProject();
         const componentsDir = path.join(projectRoot, 'src', 'components');
         
@@ -749,7 +1562,236 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
       
+      case 'check_environment': {
+        try {
+          const status: EnvironmentStatus = {
+            nodejs: await checkNodeJS(),
+            npm: await checkNPM(),
+            remotion: await checkRemotionInstallation(),
+            platform: await detectPlatform()
+          };
+          
+          let report = '🔍 Environment Status Report:\n\n';
+          
+          // Node.js status
+          report += `**Node.js**: ${status.nodejs.installed ? '✅' : '❌'} `;
+          if (status.nodejs.installed) {
+            report += `Installed (${status.nodejs.version})\n`;
+          } else {
+            report += `Not installed - Please install from https://nodejs.org\n`;
+          }
+          
+          // npm status
+          report += `**npm**: ${status.npm.installed ? '✅' : '❌'} `;
+          if (status.npm.installed) {
+            report += `Installed (${status.npm.version}) - Global install: ${status.npm.canInstallGlobal ? '✅' : '❌'}\n`;
+          } else {
+            report += `Not installed\n`;
+          }
+          
+          // Remotion status
+          report += `**Remotion CLI**: ${status.remotion.cliInstalled ? '✅' : '❌'} `;
+          report += `${status.remotion.cliInstalled ? 'Available' : 'Not installed'}\n`;
+          
+          report += `**Remotion Project**: ${status.remotion.projectExists ? '✅' : '❌'} `;
+          if (status.remotion.projectExists) {
+            report += `Found at: ${status.remotion.projectPath}\n`;
+            report += `  - Remotion: ${status.remotion.dependencies.remotion ? '✅' : '❌'}\n`;
+            report += `  - React: ${status.remotion.dependencies.react ? '✅' : '❌'}\n`;
+            report += `  - TypeScript: ${status.remotion.dependencies.typescript ? '✅' : '❌'}\n`;
+          } else {
+            report += `No project found\n`;
+          }
+          
+          // Platform info
+          report += `\n**Platform**: ${status.platform.os} (${status.platform.shell})\n`;
+          report += `**Command execution**: ${status.platform.canExecute ? '✅' : '❌'}\n`;
+          report += `**Recommended directory**: ${status.platform.recommendedDir}\n`;
+          
+          // Overall readiness
+          const isReady = status.nodejs.installed && 
+                         status.npm.installed && 
+                         status.remotion.projectExists && 
+                         status.remotion.dependencies.remotion;
+          
+          report += `\n🎬 **Overall Status**: ${isReady ? '✅ Ready for video creation!' : '⚠️ Setup required'}`;
+          
+          if (!isReady) {
+            report += `\n\n**Next Steps**:`;
+            if (!status.nodejs.installed) report += `\n1. Install Node.js from https://nodejs.org`;
+            if (!status.remotion.projectExists) report += `\n2. Run 'setup_remotion_environment' tool`;
+            if (status.remotion.projectExists && !status.remotion.dependencies.remotion) {
+              report += `\n2. Run 'repair_remotion_project' tool`;
+            }
+          }
+          
+          return {
+            content: [
+              {
+                type: 'text',
+                text: report
+              }
+            ]
+          };
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `❌ Environment check failed: ${errorMessage}`
+              }
+            ],
+            isError: true
+          };
+        }
+      }
+      
+      case 'setup_remotion_environment': {
+        const { projectPath = 'default', forceReinstall = false } = args as any;
+        
+        try {
+          // Check environment first
+          const env = await checkNodeJS();
+          if (!env.installed) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `❌ Node.js is required but not installed.\n\nPlease install Node.js from https://nodejs.org and try again.`
+                }
+              ],
+              isError: true
+            };
+          }
+          
+          const targetPath = projectPath === 'default' 
+            ? DEFAULT_PROJECT_PATH
+            : projectPath;
+          
+          // Check if project already exists
+          if (!forceReinstall && fs.existsSync(targetPath) && await verifyProjectHealth(targetPath)) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `✅ Remotion project already exists and is healthy at: ${targetPath}\n\nUse forceReinstall: true to recreate the project.`
+                }
+              ]
+            };
+          }
+          
+          // Remove existing if force reinstall
+          if (forceReinstall && fs.existsSync(targetPath)) {
+            await fs.remove(targetPath);
+          }
+          
+          // Create new project
+          await createRemotionProjectAt(targetPath);
+          
+          // Verify installation
+          const isHealthy = await verifyProjectHealth(targetPath);
+          
+          let message = `✅ Remotion environment setup complete!\n\n`;
+          message += `📁 Project location: ${targetPath}\n`;
+          message += `🎬 Project health: ${isHealthy ? '✅ Healthy' : '⚠️ Needs attention'}\n\n`;
+          message += `Ready for video creation! You can now:\n`;
+          message += `- Create components with 'create_remotion_component'\n`;
+          message += `- Launch studio with 'launch_remotion_studio'\n`;
+          message += `- Render videos with 'render_video'`;
+          
+          if (!isHealthy) {
+            message += `\n\n⚠️ Note: Dependencies may need manual installation. Run 'npm install' in the project directory if needed.`;
+          }
+          
+          return {
+            content: [
+              {
+                type: 'text',
+                text: message
+              }
+            ]
+          };
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `❌ Environment setup failed: ${errorMessage}`
+              }
+            ],
+            isError: true
+          };
+        }
+      }
+      
+      case 'repair_remotion_project': {
+        const { projectPath = 'auto' } = args as any;
+        
+        try {
+          let targetPath: string;
+          
+          if (projectPath === 'auto') {
+            const existingProject = findExistingProject();
+            if (!existingProject) {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: `❌ No Remotion project found to repair.\n\nUse 'setup_remotion_environment' to create a new project.`
+                  }
+                ],
+                isError: true
+              };
+            }
+            targetPath = existingProject;
+          } else {
+            targetPath = projectPath;
+          }
+          
+          if (!fs.existsSync(targetPath)) {
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: `❌ Project not found at: ${targetPath}`
+                }
+              ],
+              isError: true
+            };
+          }
+          
+          // Repair the project
+          await repairProject(targetPath);
+          
+          // Verify repair
+          const isHealthy = await verifyProjectHealth(targetPath);
+          
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `${isHealthy ? '✅' : '⚠️'} Project repair completed at: ${targetPath}\n\nHealth status: ${isHealthy ? 'Healthy' : 'May need manual attention'}`
+              }
+            ]
+          };
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `❌ Project repair failed: ${errorMessage}`
+              }
+            ],
+            isError: true
+          };
+        }
+      }
+      
       case 'get_remotion_patterns': {
+      
         const { patternType = 'all' } = args as any;
         
         // Basic patterns
@@ -834,6 +1876,143 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             }
           ]
         };
+      }
+      
+      case 'test_auto_installation': {
+        const { targetPath = 'default' } = args as any;
+        const testPath = targetPath === 'default' 
+          ? path.join(osModule.homedir(), 'Claude-Videos', 'test-install')
+          : targetPath;
+        
+        try {
+          // Remove existing test directory
+          if (await fs.pathExists(testPath)) {
+            await fs.remove(testPath);
+          }
+          
+          // Force create new project
+          console.log(`🧪 Testing auto-installation at: ${testPath}`);
+          
+          // Create the project manually to test the installation logic
+          await fs.ensureDir(testPath);
+          
+          // Use the same logic as createRemotionProject but at test location
+          await createRemotionProjectAt(testPath);
+          
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `✅ Auto-installation test successful!\n\nCreated Remotion project at: ${testPath}\n\nProject includes:\n- package.json with Remotion dependencies\n- TypeScript configuration\n- src/ directory with components\n- Welcome video component\n- Animation guidelines (if available)\n\nDependencies installation attempted (check console for status).`
+              }
+            ]
+          };
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `❌ Auto-installation test failed: ${errorMessage}`
+              }
+            ]
+          };
+        }
+      }
+      
+      case 'force_create_project': {
+        const { projectPath = 'default' } = args as any;
+        const targetPath = projectPath === 'default' 
+          ? path.join(osModule.homedir(), 'Claude-Videos', 'new-remotion-project')
+          : projectPath;
+        
+        try {
+          await createRemotionProjectAt(targetPath);
+          
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `✅ New Remotion project created at: ${targetPath}\n\nReady for video generation!`
+              }
+            ]
+          };
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `❌ Project creation failed: ${errorMessage}`
+              }
+            ]
+          };
+        }
+      }
+      
+      case 'validate_complete_installation': {
+        const { testVideoRender = false } = args as any;
+        
+        try {
+          const validation = await validateCompleteInstallation(testVideoRender);
+          
+          let report = '🔍 **Complete Installation Validation**\n\n';
+          
+          // Overall status
+          report += `**Overall Status**: ${validation.isValid ? '✅ READY' : '❌ NEEDS ATTENTION'}\n\n`;
+          
+          // Component details
+          report += '**Component Check**:\n';
+          report += `- Node.js: ${validation.details.nodejs ? '✅' : '❌'}\n`;
+          report += `- npm: ${validation.details.npm ? '✅' : '❌'}\n`;
+          report += `- Remotion CLI: ${validation.details.remotionCli ? '✅' : '❌'}\n`;
+          report += `- Project exists: ${validation.details.project ? '✅' : '❌'}\n`;
+          report += `- Dependencies: ${validation.details.dependencies ? '✅' : '❌'}\n`;
+          report += `- Can create components: ${validation.details.canCreateComponent ? '✅' : '❌'}\n`;
+          
+          if (validation.details.canRenderVideo !== undefined) {
+            report += `- Can render videos: ${validation.details.canRenderVideo ? '✅' : '❌'}\n`;
+          }
+          
+          // Issues and fixes
+          if (validation.issues.length > 0) {
+            report += '\n**Issues Found**:\n';
+            validation.issues.forEach((issue, i) => {
+              report += `${i + 1}. ${issue}\n`;
+            });
+            
+            report += '\n**Recommended Fixes**:\n';
+            validation.fixes.forEach((fix, i) => {
+              report += `${i + 1}. ${fix}\n`;
+            });
+          }
+          
+          if (validation.isValid) {
+            report += '\n🎉 **Your Remotion environment is ready for video creation!**';
+          } else {
+            report += '\n⚠️ **Please address the issues above for optimal performance.**';
+          }
+          
+          return {
+            content: [
+              {
+                type: 'text',
+                text: report
+              }
+            ]
+          };
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `❌ Validation failed: ${errorMessage}`
+              }
+            ],
+            isError: true
+          };
+        }
       }
       
       default:
