@@ -1,0 +1,43 @@
+{
+  "name": "@rough-cuts/remotion-ai-copilot-mcp",
+  "version": "2.0.0",
+  "description": "AI-powered Remotion video generation MCP server for Claude Desktop",
+  "main": "dist/index.js",
+  "type": "module",
+  "bin": {
+    "remotion-ai-copilot": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js", 
+    "dev": "tsx src/index.ts",
+    "test": "tsx src/index.ts",
+    "clean": "rimraf dist",
+    "prepublish": "npm run clean && npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.6.0",
+    "fs-extra": "^11.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/fs-extra": "^11.0.4",
+    "tsx": "^4.19.1",
+    "typescript": "^5.0.0",
+    "rimraf": "^5.0.0"
+  },
+  "keywords": [
+    "remotion",
+    "video",
+    "animation", 
+    "ai",
+    "claude",
+    "mcp",
+    "code-generation",
+    "claude-desktop"
+  ],
+  "files": [
+    "dist/**/*",
+    "README.md"
+  ]
+}
