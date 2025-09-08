@@ -2,6 +2,7 @@ import React from 'react';
 import { Composition } from 'remotion';
 import GitHubProfileShowcase from './components/GitHubProfileShowcase';
 import AutoInstallTest from './components/AutoInstallTest';
+import AutoInstallationDemo from './components/AutoInstallationDemo';
 
 /**
  * Remotion Root Component
@@ -22,6 +23,14 @@ export const RemotionRoot: React.FC = () => {
         id="AutoInstallTest"
         component={AutoInstallTest}
         durationInFrames={90}
+        fps={30}
+        width={1920}
+        height={1080}
+      />
+      <Composition
+        id="AutoInstallationDemo"
+        component={AutoInstallationDemo}
+        durationInFrames={150}
         fps={30}
         width={1920}
         height={1080}

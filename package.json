@@ -1,5 +1,5 @@
 {
-  "name": "@rough-cuts/mcp",
+  "name": "@endlessblink/rough-cuts-mcp",
   "version": "1.0.0",
   "description": "Zero-setup Remotion video generation for Claude Desktop. Auto-installs projects, dependencies, and guidelines on first use.",
   "main": "setup-universal.js",
