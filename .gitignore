@@ -1,11 +1,46 @@
+# Dependencies
 node_modules/
+*/node_modules/
+**/node_modules/
+
+# Build outputs
 dist/
+build/
+out/
+*.tsbuildinfo
+.remotion/
+
+# Environment and secrets
+.env*
 *.log
-.DS_Store
-.env
-.env.local
 *.tmp
 *.temp
-out/
-build/
-coverage/
+*.cache
+
+# Operating system
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# IDE and editors
+.vscode/
+.idea/
+*.code-workspace
+
+# Sensitive documentation
+Docs/debugging/
+Docs/logs/
+**/debugging/
+**/*.log
+
+# NPM
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime
+*.pid
+*.seed
+*.pid.lock
