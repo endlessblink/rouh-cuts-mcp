@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * Enhanced Remotion MCP Server - With Delete Component Functionality
- * Adds component deletion capabilities for end users
+ * Clean Remotion MCP Server - Template Literal Corruption Fix
+ * Avoids complex template literals to prevent WSL2/Windows encoding issues
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -22,7 +22,7 @@ const __dirname = path.dirname(__filename);
 const server = new Server(
   {
     name: 'rough-cuts-mcp',
-    version: '2.1.0', // Updated version
+    version: '2.0.0',
   },
   {
     capabilities: {
@@ -104,62 +104,6 @@ async function createSimpleComponent(name: string, code: string): Promise<void> 
   await fs.ensureDir(componentsDir);
   await fs.writeFile(componentPath, code);
 }
-// NEW: Delete component helper function
-async function deleteComponent(componentName: string): Promise<void> {
-  const projectRoot = getProjectRoot();
-  const componentPath = path.join(projectRoot, 'src', 'components', componentName + '.tsx');
-  
-  // Check if component exists
-  if (!await fs.pathExists(componentPath)) {
-    throw new Error(`Component "${componentName}" not found`);
-  }
-  
-  // Delete the component file
-  await fs.remove(componentPath);
-  
-  // Remove from Root.tsx composition
-  await removeFromRootComposition(componentName);
-}
-
-// NEW: Remove component from Root.tsx
-async function removeFromRootComposition(componentName: string): Promise<void> {
-  const projectRoot = getProjectRoot();
-  const rootPath = path.join(projectRoot, 'src', 'Root.tsx');
-  
-  if (!await fs.pathExists(rootPath)) {
-    return; // No Root.tsx to update
-  }
-  
-  let rootContent = await fs.readFile(rootPath, 'utf-8');
-  
-  // Remove import line - handle multiple import formats
-  const importPatterns = [
-    `import ${componentName} from './components/${componentName}';`,           // default import
-    `import { ${componentName} } from './components/${componentName}';`,       // named import
-    `import {${componentName}} from './components/${componentName}';`,         // named import (no spaces)
-  ];
-  
-  for (const pattern of importPatterns) {
-    rootContent = rootContent.replace(pattern + '\n', '');
-    rootContent = rootContent.replace(pattern, ''); // Handle case without newline
-  }
-  
-  // Remove composition block (multi-line)
-  const compositionRegex = new RegExp(
-    `\\s*<Composition[^>]*\\n[^>]*id="${componentName}"[^>]*\\n[^>]*component=\\{${componentName}\\}[^>]*\\n[^>]*durationInFrames=\\{[^}]*\\}[^>]*\\n[^>]*fps=\\{[^}]*\\}[^>]*\\n[^>]*width=\\{[^}]*\\}[^>]*\\n[^>]*height=\\{[^}]*\\}[^>]*\\n[^>]*/>`,
-    'g'
-  );
-  rootContent = rootContent.replace(compositionRegex, '');
-  
-  // Also handle single-line composition format
-  const singleLineRegex = new RegExp(
-    `\\s*<Composition[^>]*id="${componentName}"[^>]*/>`,
-    'g'
-  );
-  rootContent = rootContent.replace(singleLineRegex, '');
-  
-  await fs.writeFile(rootPath, rootContent);
-}
 
 async function updateRootComposition(componentName: string, duration: number = 90): Promise<void> {
   const projectRoot = getProjectRoot();
@@ -240,8 +184,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           },
           required: ['componentName', 'code']
         }
-      },
-      {
+      },      {
         name: 'edit_remotion_component',
         description: 'Edit an existing Remotion component',
         inputSchema: {
@@ -257,20 +200,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             }
           },
           required: ['componentName', 'newCode']
-        }
-      },
-      {
-        name: 'delete_component',
-        description: 'Delete an existing Remotion component',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            componentName: {
-              type: 'string',
-              description: 'Name of the component to delete'
-            }
-          },
-          required: ['componentName']
         }
       },
       {
@@ -300,8 +229,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             }
           }
         }
-      },
-      {
+      },      {
         name: 'render_video',
         description: 'Render component to MP4',
         inputSchema: {
@@ -329,13 +257,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: 'get_remotion_patterns',
-        description: 'Get proven Remotion patterns and development guidelines',
+        description: 'Get proven Remotion patterns',
         inputSchema: {
           type: 'object',
           properties: {
             patternType: {
               type: 'string',
-              enum: ['all', 'basic', 'github', 'product', 'animation', 'validation', 'guidelines', 'layout-rules', 'project-status', 'quick-reference', 'detailed-design'],
+              enum: ['all', 'basic', 'github', 'product', 'animation', 'validation'],
               default: 'all'
             }
           }
@@ -344,7 +272,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     ]
   };
 });
-
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   
@@ -382,22 +309,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
       
-      // NEW: Delete component handler
-      case 'delete_component': {
-        const { componentName } = args as any;
-        
-        await deleteComponent(componentName);
-        
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'Component "' + componentName + '" deleted successfully! Both the component file and Root.tsx registration have been removed.'
-            }
-          ]
-        };
-      }
-      
       case 'read_component': {
         const { componentName } = args as any;
         const projectRoot = getProjectRoot();
@@ -417,8 +328,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             }
           ]
         };
-      }
-      
+      }      
       case 'launch_remotion_studio': {
         const { port = 3000 } = args as any;
         const projectRoot = getProjectRoot();
@@ -490,8 +400,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             }
           });
         });
-      }
-      
+      }      
       case 'list_components': {
         const projectRoot = getProjectRoot();
         const componentsDir = path.join(projectRoot, 'src', 'components');
@@ -525,7 +434,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'get_remotion_patterns': {
         const { patternType = 'all' } = args as any;
         
-        // Basic patterns
         const patterns = {
           basic: 'Basic React component patterns for Remotion',
           github: 'GitHub showcase patterns',
@@ -534,67 +442,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           validation: 'Component validation patterns'
         };
         
-        // Guideline files mapping
-        const guidelineFiles = {
-          'guidelines': 'README.md',
-          'layout-rules': 'REMOTION_ANIMATION_RULES.md',
-          'project-status': 'PROJECT_STATUS.md',
-          'quick-reference': 'QUICK_REFERENCE.md',
-          'detailed-design': 'DETAILED_DESIGN_GUIDELINES.md'
-        };
-        
-        // Check if this is a guideline request
-        if (Object.keys(guidelineFiles).includes(patternType)) {
-          const projectRoot = getProjectRoot();
-          const guidelinesDir = path.join(projectRoot, 'claude-dev-guidelines');
-          const fileName = guidelineFiles[patternType as keyof typeof guidelineFiles];
-          const filePath = path.join(guidelinesDir, fileName);
-          
-          try {
-            if (await fs.pathExists(filePath)) {
-              const content = await fs.readFile(filePath, 'utf-8');
-              return {
-                content: [
-                  {
-                    type: 'text',
-                    text: `Remotion Guidelines (${patternType}):\n\n${content}`
-                  }
-                ]
-              };
-            } else {
-              return {
-                content: [
-                  {
-                    type: 'text',
-                    text: `Guideline file not found: ${fileName}. Available guideline types: ${Object.keys(guidelineFiles).join(', ')}`
-                  }
-                ]
-              };
-            }
-          } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: `Error reading guideline file: ${errorMessage}`
-                }
-              ]
-            };
-          }
-        }
-        
-        // Handle basic patterns
         let result = '';
         if (patternType === 'all') {
-          result = 'Basic Patterns:\n' + 
-            Object.entries(patterns)
-              .map(([key, desc]) => `${key}: ${desc}`)
-              .join('\n') +
-            '\n\nGuideline Types:\n' +
-            Object.keys(guidelineFiles)
-              .map(type => `${type}: Access development guidelines and rules`)
-              .join('\n');
+          result = Object.entries(patterns)
+            .map(([key, desc]) => key + ': ' + desc)
+            .join('\n');
         } else {
           result = patterns[patternType as keyof typeof patterns] || 'Pattern not found';
         }
@@ -603,12 +455,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [
             {
               type: 'text',
-              text: `Remotion Patterns (${patternType}):\n\n${result}`
+              text: 'Remotion Patterns (' + patternType + '):\n\n' + result
             }
           ]
         };
-      }
-      
+      }      
       default:
         throw new Error('Unknown tool: ' + name);
     }
@@ -631,7 +482,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   
-  console.error('🎬 Rough Cuts MCP Server running (with delete functionality)');
+  console.error('🎬 Rough Cuts MCP Server running (clean version)');
 }
 
 // Fixed entry point detection for Windows/ES modules

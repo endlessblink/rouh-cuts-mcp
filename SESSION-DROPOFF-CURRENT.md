@@ -37,6 +37,36 @@ const compositionJsx = \`<Composition  // ❌ BROKEN
 const compositionJsx = `<Composition   // ✅ CORRECT
 ```
 
+## 🚨 CRITICAL ANIMATION LAYOUT RULES
+**⚠️ COPY THESE TO EVERY NEW CHAT - MANDATORY FOR ALL ANIMATIONS**
+
+### **Layout Safety Rules:**
+- ✅ **ONLY ONE SCENE VISIBLE** at a time using: `{currentScene === 'intro' && <Content />}`
+- ❌ **NEVER multiple `position: 'absolute'`** elements that can overlap
+- ✅ **ALWAYS use scene-based rendering** instead of opacity-based overlays
+- ✅ **Minimum 60px spacing** between sections, 80px container padding
+- ✅ **Use `minHeight` not `height`** for text containers
+
+### **Safe Scene Pattern (MANDATORY):**
+```typescript
+const currentScene = 
+  frame < 30 ? 'intro' :
+  frame < 90 ? 'main' : 'outro';
+
+return (
+  <AbsoluteFill style={containerStyles}>
+    {currentScene === 'intro' && <IntroContent />}
+    {currentScene === 'main' && <MainContent />}  
+    {currentScene === 'outro' && <OutroContent />}
+  </AbsoluteFill>
+);
+```
+
+### **Banned Patterns (NEVER USE):**
+- ❌ `gridTemplateColumns: 'repeat(auto-fit, ...)'` - use explicit columns
+- ❌ Multiple `position: 'absolute'` elements - causes text overlap
+- ❌ Overlapping opacity-based scenes - use scene switching instead
+
 ## 🎯 Like-I-Said Memory Context
 
 ### User's Explicit Requirements
@@ -48,6 +78,7 @@ const compositionJsx = `<Composition   // ✅ CORRECT
 ### Critical Lessons from Previous 6 Failures
 1. **AST-based conversion pipelines ALWAYS fail** - generates broken className attributes
 2. **Web-to-video conversion is fundamentally flawed** - poor typography, runtime errors
+3. **Text overlap issues from bad layout patterns** - FIXED with scene-based rendering
 3. **Complex systems introduce more problems** - keep it simple and direct
 4. **Claude needs official documentation** - Context7 MCP integration was the key breakthrough
 
