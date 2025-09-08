@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * Enhanced Remotion MCP Server - With Delete Component Functionality
- * Adds component deletion capabilities for end users
+ * Enhanced Remotion MCP Server - With Auto-Installation
+ * Automatically creates Remotion projects and installs dependencies when needed
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -13,8 +13,9 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import fs from 'fs-extra';
 import path from 'path';
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import { fileURLToPath } from 'url';
+import os from 'os';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,7 +23,7 @@ const __dirname = path.dirname(__filename);
 const server = new Server(
   {
     name: 'rough-cuts-mcp',
-    version: '2.1.0', // Updated version
+    version: '3.0.0', // Updated for auto-installation features
   },
   {
     capabilities: {
@@ -31,72 +32,296 @@ const server = new Server(
   }
 );
 
-function getProjectRoot(): string {
-  // Calculate project root based on server location
-  // Server is at: .../rough-cuts-mcp/mcp-server/dist/index.js
-  // Project root is: .../rough-cuts-mcp/
-  const serverDir = path.dirname(__filename); // dist directory
-  const mcpServerDir = path.dirname(serverDir); // mcp-server directory  
-  const projectRoot = path.dirname(mcpServerDir); // rough-cuts-mcp directory
-  
-  // Verify this is actually a Remotion project
-  const packageJsonPath = path.join(projectRoot, 'package.json');
-  if (fs.existsSync(packageJsonPath)) {
-    try {
-      const packageJson = fs.readJsonSync(packageJsonPath);
-      if (packageJson.dependencies?.remotion || packageJson.devDependencies?.remotion) {
-        return projectRoot;
-      }
-    } catch (e) {
-      // Fall back to search method if package.json is invalid
-    }
+// Auto-installation configuration
+const DEFAULT_PROJECT_PATH = path.join(os.homedir(), 'Claude-Videos', 'remotion-project');
+
+async function ensureRemotionProject(): Promise<string> {
+  // First, try to find existing project using current logic
+  const existingProject = findExistingProject();
+  if (existingProject) {
+    return existingProject;
   }
   
-  // Fallback: search from current working directory
-  let currentDir = process.cwd();
+  // No project found - create one automatically
+  console.log('🎬 No Remotion project found. Creating one automatically...');
+  return await createRemotionProject();
+}
+
+function findExistingProject(): string | null {
+  // Calculate project root based on server location
+  const serverDir = path.dirname(__filename);
+  const mcpServerDir = path.dirname(serverDir);
+  const projectRoot = path.dirname(mcpServerDir);
   
+  // Check if current location is a Remotion project
+  if (isRemotionProject(projectRoot)) {
+    return projectRoot;
+  }
+  
+  // Search from current working directory
+  let currentDir = process.cwd();
   while (currentDir !== path.parse(currentDir).root) {
-    const packageJsonPath = path.join(currentDir, 'package.json');
-    
-    if (fs.existsSync(packageJsonPath)) {
-      try {
-        const packageJson = fs.readJsonSync(packageJsonPath);
-        
-        if (packageJson.dependencies?.remotion || packageJson.devDependencies?.remotion) {
-          return currentDir;
-        }
-      } catch (e) {
-        // Continue searching if package.json is invalid
-      }
+    if (isRemotionProject(currentDir)) {
+      return currentDir;
     }
-    
     currentDir = path.dirname(currentDir);
   }
   
-  // Last resort: use calculated project root even if verification failed
-  return projectRoot;
+  // Check default location
+  if (fs.existsSync(DEFAULT_PROJECT_PATH) && isRemotionProject(DEFAULT_PROJECT_PATH)) {
+    return DEFAULT_PROJECT_PATH;
+  }
+  
+  return null;
 }
 
-async function createSimpleComponent(name: string, code: string): Promise<void> {
-  const projectRoot = getProjectRoot();
-  
-  // Validate that we found a valid Remotion project
-  const packageJsonPath = path.join(projectRoot, 'package.json');
+function isRemotionProject(projectPath: string): boolean {
+  const packageJsonPath = path.join(projectPath, 'package.json');
   if (!fs.existsSync(packageJsonPath)) {
-    throw new Error(`Could not find Remotion project root. No package.json found at: ${projectRoot}`);
+    return false;
   }
   
   try {
     const packageJson = fs.readJsonSync(packageJsonPath);
-    if (!packageJson.dependencies?.remotion && !packageJson.devDependencies?.remotion) {
-      throw new Error(`Could not find Remotion project root. Make sure you are in a directory with a package.json that includes Remotion. Current path: ${projectRoot}`);
+    return !!(packageJson.dependencies?.remotion || packageJson.devDependencies?.remotion);
+  } catch (e) {
+    return false;
+  }
+}
+
+async function createRemotionProject(): Promise<string> {
+  console.log(`📁 Creating Remotion project at: ${DEFAULT_PROJECT_PATH}`);
+  
+  // Ensure directory exists
+  await fs.ensureDir(DEFAULT_PROJECT_PATH);
+  
+  // Create package.json
+  const packageJson = {
+    "name": "claude-generated-videos",
+    "version": "1.0.0",
+    "description": "Auto-generated Remotion project for Claude Desktop",
+    "scripts": {
+      "dev": "remotion studio",
+      "build": "remotion render",
+      "preview": "remotion preview",
+      "upgrade": "remotion upgrade"
+    },
+    "dependencies": {
+      "@remotion/cli": "4.0.340",
+      "@remotion/player": "4.0.340", 
+      "react": "18.2.0",
+      "react-dom": "18.2.0",
+      "remotion": "4.0.340",
+      "lucide-react": "^0.263.1"
+    },
+    "devDependencies": {
+      "@types/react": "^18.0.0",
+      "typescript": "^5.0.0"
+    }
+  };
+  
+  await fs.writeJson(path.join(DEFAULT_PROJECT_PATH, 'package.json'), packageJson, { spaces: 2 });
+  
+  // Create tsconfig.json
+  const tsConfig = {
+    "compilerOptions": {
+      "target": "ES2022",
+      "lib": ["DOM", "DOM.Iterable", "ES2022"],
+      "allowJs": true,
+      "skipLibCheck": true,
+      "esModuleInterop": true,
+      "allowSyntheticDefaultImports": true,
+      "strict": true,
+      "forceConsistentCasingInFileNames": true,
+      "moduleResolution": "node",
+      "resolveJsonModule": true,
+      "isolatedModules": true,
+      "noEmit": true,
+      "jsx": "react-jsx"
+    },
+    "include": ["src"]
+  };
+  
+  await fs.writeJson(path.join(DEFAULT_PROJECT_PATH, 'tsconfig.json'), tsConfig, { spaces: 2 });
+  
+  // Create remotion.config.ts
+  const remotionConfig = `import {Config} from '@remotion/cli/config';
+
+Config.setVideoImageFormat('jpeg');
+Config.setOverwriteOutput(true);
+`;
+  
+  await fs.writeFile(path.join(DEFAULT_PROJECT_PATH, 'remotion.config.ts'), remotionConfig);
+  
+  // Create src directory and initial files
+  const srcDir = path.join(DEFAULT_PROJECT_PATH, 'src');
+  await fs.ensureDir(srcDir);
+  await fs.ensureDir(path.join(srcDir, 'components'));
+  
+  // Create index.ts
+  const indexContent = `export * from './Root';`;
+  await fs.writeFile(path.join(srcDir, 'index.ts'), indexContent);
+  
+  // Create Root.tsx with welcome video
+  const rootContent = `import React from 'react';
+import { Composition } from 'remotion';
+import { WelcomeVideo } from './components/WelcomeVideo';
+
+export const RemotionRoot: React.FC = () => {
+  return (
+    <>
+      <Composition
+        id="WelcomeVideo"
+        component={WelcomeVideo}
+        durationInFrames={150}
+        fps={30}
+        width={1920}
+        height={1080}
+      />
+    </>
+  );
+};
+`;
+  
+  await fs.writeFile(path.join(srcDir, 'Root.tsx'), rootContent);
+  
+  // Create welcome video component
+  const welcomeComponent = `import React from 'react';
+import { AbsoluteFill, useCurrentFrame, interpolate, Easing } from 'remotion';
+
+export const WelcomeVideo: React.FC = () => {
+  const frame = useCurrentFrame();
+  
+  const titleOpacity = interpolate(frame, [0, 30], [0, 1], {
+    easing: Easing.out(Easing.cubic)
+  });
+  
+  const titleY = interpolate(frame, [0, 30], [50, 0], {
+    easing: Easing.out(Easing.cubic)
+  });
+  
+  const subtitleOpacity = interpolate(frame, [20, 50], [0, 1], {
+    easing: Easing.out(Easing.cubic)
+  });
+  
+  return (
+    <AbsoluteFill
+      style={{
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        textAlign: 'center',
+        color: 'white'
+      }}
+    >
+      <h1
+        style={{
+          fontSize: '80px',
+          fontWeight: 'bold',
+          margin: '0 0 30px 0',
+          opacity: titleOpacity,
+          transform: \`translateY(\${titleY}px)\`
+        }}
+      >
+        🎬 Rough Cuts MCP
+      </h1>
+      
+      <p
+        style={{
+          fontSize: '32px',
+          opacity: subtitleOpacity,
+          maxWidth: '800px',
+          lineHeight: 1.4
+        }}
+      >
+        Auto-generated Remotion project ready for Claude Desktop!<br />
+        Ask Claude to create amazing videos.
+      </p>
+    </AbsoluteFill>
+  );
+};
+`;
+  
+  await fs.writeFile(path.join(srcDir, 'components', 'WelcomeVideo.tsx'), welcomeComponent);
+  
+  // Copy guidelines if they exist in the MCP
+  await copyGuidelinesIfAvailable(DEFAULT_PROJECT_PATH);
+  
+  // Install dependencies
+  console.log('📦 Installing Remotion dependencies...');
+  try {
+    execSync('npm install', { 
+      cwd: DEFAULT_PROJECT_PATH, 
+      stdio: 'inherit' 
+    });
+    console.log('✅ Remotion project created successfully!');
+  } catch (error) {
+    console.log('⚠️  Project created but npm install failed. Dependencies will be installed when first component is created.');
+  }
+  
+  return DEFAULT_PROJECT_PATH;
+}
+
+async function copyGuidelinesIfAvailable(projectPath: string): Promise<void> {
+  try {
+    // Try to find guidelines in the MCP server directory
+    const serverDir = path.dirname(__filename);
+    const mcpServerDir = path.dirname(serverDir);
+    const mcpRootDir = path.dirname(mcpServerDir);
+    const guidelinesSource = path.join(mcpRootDir, 'claude-dev-guidelines');
+    
+    if (fs.existsSync(guidelinesSource)) {
+      const guidelinesTarget = path.join(projectPath, 'claude-dev-guidelines');
+      await fs.copy(guidelinesSource, guidelinesTarget);
+      console.log('📋 Copied animation guidelines to project');
     }
   } catch (error) {
-    if (error instanceof Error && error.message.includes('Could not find Remotion project root')) {
-      throw error;
-    }
-    throw new Error(`Could not find Remotion project root. Invalid package.json at: ${packageJsonPath}`);
+    // Guidelines not essential, continue without them
+    console.log('📋 Guidelines not available, project will work without them');
   }
+}
+
+function getProjectRoot(): string {
+  // Use the new auto-installation logic
+  const existingProject = findExistingProject();
+  if (existingProject) {
+    return existingProject;
+  }
+  
+  // If no project exists, the calling function should handle creation
+  // For now, return the default path (will be created when needed)
+  return DEFAULT_PROJECT_PATH;
+}
+
+async function ensureDependenciesInstalled(projectPath: string): Promise<void> {
+  const nodeModulesPath = path.join(projectPath, 'node_modules');
+  
+  // Check if node_modules exists and has Remotion
+  if (fs.existsSync(nodeModulesPath) && fs.existsSync(path.join(nodeModulesPath, 'remotion'))) {
+    return; // Dependencies already installed
+  }
+  
+  console.log('📦 Installing Remotion dependencies...');
+  try {
+    execSync('npm install', { 
+      cwd: projectPath, 
+      stdio: 'inherit' 
+    });
+    console.log('✅ Dependencies installed successfully!');
+  } catch (error) {
+    console.warn('⚠️  Failed to install dependencies automatically. You may need to run "npm install" manually.');
+  }
+}
+
+async function createSimpleComponent(name: string, code: string): Promise<void> {
+  // Ensure Remotion project exists (auto-create if needed)
+  const projectRoot = await ensureRemotionProject();
+  
+  // Ensure dependencies are installed
+  await ensureDependenciesInstalled(projectRoot);
   
   const componentsDir = path.join(projectRoot, 'src', 'components');
   const componentPath = path.join(componentsDir, name + '.tsx');
@@ -106,7 +331,7 @@ async function createSimpleComponent(name: string, code: string): Promise<void> 
 }
 // NEW: Delete component helper function
 async function deleteComponent(componentName: string): Promise<void> {
-  const projectRoot = getProjectRoot();
+  const projectRoot = await ensureRemotionProject();
   const componentPath = path.join(projectRoot, 'src', 'components', componentName + '.tsx');
   
   // Check if component exists
@@ -123,7 +348,7 @@ async function deleteComponent(componentName: string): Promise<void> {
 
 // NEW: Remove component from Root.tsx
 async function removeFromRootComposition(componentName: string): Promise<void> {
-  const projectRoot = getProjectRoot();
+  const projectRoot = await ensureRemotionProject();
   const rootPath = path.join(projectRoot, 'src', 'Root.tsx');
   
   if (!await fs.pathExists(rootPath)) {
@@ -162,7 +387,7 @@ async function removeFromRootComposition(componentName: string): Promise<void> {
 }
 
 async function updateRootComposition(componentName: string, duration: number = 90): Promise<void> {
-  const projectRoot = getProjectRoot();
+  const projectRoot = await ensureRemotionProject();
   const rootPath = path.join(projectRoot, 'src', 'Root.tsx');
   
   let rootContent = '';
@@ -400,7 +625,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       
       case 'read_component': {
         const { componentName } = args as any;
-        const projectRoot = getProjectRoot();
+        const projectRoot = await ensureRemotionProject();
         const componentPath = path.join(projectRoot, 'src', 'components', componentName + '.tsx');
         
         if (!await fs.pathExists(componentPath)) {
@@ -421,7 +646,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       
       case 'launch_remotion_studio': {
         const { port = 3000 } = args as any;
-        const projectRoot = getProjectRoot();
+        const projectRoot = await ensureRemotionProject();
+        await ensureDependenciesInstalled(projectRoot);
         
         return new Promise((resolve) => {
           const studio = spawn('npx', ['remotion', 'studio', '--port=' + port], {
@@ -448,7 +674,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       
       case 'render_video': {
         const { componentId, outputPath } = args as any;
-        const projectRoot = getProjectRoot();
+        const projectRoot = await ensureRemotionProject();
+        await ensureDependenciesInstalled(projectRoot);
         const defaultOutput = path.join(projectRoot, 'out', componentId + '.mp4');
         const finalOutput = outputPath || defaultOutput;
         
@@ -493,7 +720,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
       
       case 'list_components': {
-        const projectRoot = getProjectRoot();
+        const projectRoot = await ensureRemotionProject();
         const componentsDir = path.join(projectRoot, 'src', 'components');
         
         if (!await fs.pathExists(componentsDir)) {
@@ -545,7 +772,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         
         // Check if this is a guideline request
         if (Object.keys(guidelineFiles).includes(patternType)) {
-          const projectRoot = getProjectRoot();
+          const projectRoot = await ensureRemotionProject();
           const guidelinesDir = path.join(projectRoot, 'claude-dev-guidelines');
           const fileName = guidelineFiles[patternType as keyof typeof guidelineFiles];
           const filePath = path.join(guidelinesDir, fileName);
