@@ -44,3 +44,17 @@ lerna-debug.log*
 *.pid
 *.seed
 *.pid.lock
+
+# Development files not for NPM
+scripts/
+memories/
+tasks/
+*-backup/
+*-corrupted-backup/
+Docs/
+test-*.js
+test-*.bat
+install.bat
+install.sh
+.claude/
+out/
