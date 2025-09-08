@@ -1,5 +1,5 @@
 {
-  "name": "@rough-cuts/mcp",
+  "name": "@endlessblink/rough-cuts-mcp",
   "version": "1.0.0",
   "description": "One-click Remotion video generation for Claude Desktop - Zero setup required",
   "main": "setup-universal.js",
@@ -45,7 +45,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/rough-cuts-mcp.git"
+    "url": "https://github.com/endlessblink/rouh-cuts-mcp.git"
   },
   "license": "MIT",
   "engines": {
