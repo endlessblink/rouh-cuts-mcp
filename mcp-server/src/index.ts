@@ -146,6 +146,35 @@ class RoughCutsMCPServer {
             required: ['componentName'],
           },
         },
+        {
+          name: 'get_animation_guidelines',
+          description: 'Get built-in professional animation guidelines and patterns for creating high-quality Remotion videos',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              type: {
+                type: 'string',
+                description: 'Type of guidelines to retrieve',
+                enum: ['essential-rules', 'safe-patterns', 'professional-template', 'all'],
+                default: 'essential-rules',
+              },
+            },
+          },
+        },
+        {
+          name: 'read_guidelines_file',
+          description: 'Read design guidelines and animation patterns from the claude-dev-guidelines folder',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              filename: {
+                type: 'string',
+                description: 'Guidelines file to read (e.g., "PROJECT_CONFIG.md", "ADVANCED/ANIMATION_PATTERNS.md")',
+              },
+            },
+            required: ['filename'],
+          },
+        },
       ],
     }));
 
@@ -159,17 +188,21 @@ class RoughCutsMCPServer {
           case 'setup_remotion_environment':
             return await this.setupRemotionEnvironment(args?.projectPath);
           case 'launch_remotion_studio':
-            return await this.launchRemotionStudio(args?.port || 3000);
+            return await this.launchRemotionStudio((args as any)?.port || 3000);
           case 'create_remotion_component':
             return await this.createRemotionComponent(
-              args?.componentName,
-              args?.code,
-              args?.duration || 3
+              (args as any)?.componentName,
+              (args as any)?.code,
+              (args as any)?.duration || 3
             );
           case 'list_components':
             return await this.listComponents();
           case 'repair_component':
-            return await this.repairComponent(args?.componentName);
+            return await this.repairComponent((args as any)?.componentName);
+          case 'get_animation_guidelines':
+            return await this.getAnimationGuidelines((args as any)?.type || 'essential-rules');
+          case 'read_guidelines_file':
+            return await this.readGuidelinesFile((args as any)?.filename);
           default:
             throw new McpError(
               ErrorCode.MethodNotFound,
@@ -179,7 +212,7 @@ class RoughCutsMCPServer {
       } catch (error) {
         throw new McpError(
           ErrorCode.InternalError,
-          `Tool execution failed: ${error.message}`
+          `Tool execution failed: ${(error as Error).message}`
         );
       }
     });
@@ -190,9 +223,9 @@ class RoughCutsMCPServer {
     try {
       const results = {
         platform: `${os.platform()} ${os.release()} (${os.arch()})`,
-        nodeVersion: null,
-        npmVersion: null,
-        npxVersion: null,
+        nodeVersion: null as string | null,
+        npmVersion: null as string | null,
+        npxVersion: null as string | null,
         executables: {},
         status: 'CHECKING',
       };
@@ -212,7 +245,7 @@ class RoughCutsMCPServer {
           const version = await this.getVersion(executables.node, '--version');
           results.nodeVersion = version;
         } catch (error) {
-          this.nodeDetector.log('Warning: Could not get Node.js version:', error.message);
+          this.nodeDetector.log('Warning: Could not get Node.js version:', (error as Error).message);
         }
       }
 
@@ -221,7 +254,7 @@ class RoughCutsMCPServer {
           const version = await this.getVersion(executables.npm, '--version');
           results.npmVersion = version;
         } catch (error) {
-          this.nodeDetector.log('Warning: Could not get npm version:', error.message);
+          this.nodeDetector.log('Warning: Could not get npm version:', (error as Error).message);
         }
       }
 
@@ -230,7 +263,7 @@ class RoughCutsMCPServer {
           const version = await this.getVersion(executables.npx, '--version');
           results.npxVersion = version;
         } catch (error) {
-          this.nodeDetector.log('Warning: Could not get npx version:', error.message);
+          this.nodeDetector.log('Warning: Could not get npx version:', (error as Error).message);
         }
       }
 
@@ -267,7 +300,7 @@ class RoughCutsMCPServer {
         content: [
           {
             type: 'text',
-            text: `Environment check failed: ${error.message}`,
+            text: `Environment check failed: ${(error as Error).message}`,
           },
         ],
       };
@@ -314,9 +347,9 @@ class RoughCutsMCPServer {
     });
   }
 
-  private async setupRemotionEnvironment(customPath?: string) {
+  private async setupRemotionEnvironment(customPath?: unknown) {
     try {
-      const projectPath = customPath || path.join(os.homedir(), '.claude-videos', 'remotion-workspace');
+      const projectPath = (customPath as string) || path.join(os.homedir(), '.claude-videos', 'remotion-workspace');
       
       // Ensure project directory exists
       await fs.mkdir(projectPath, { recursive: true });
@@ -352,7 +385,7 @@ class RoughCutsMCPServer {
         content: [
           {
             type: 'text',
-            text: `Failed to setup Remotion environment: ${error.message}`,
+            text: `Failed to setup Remotion environment: ${(error as Error).message}`,
           },
         ],
       };
@@ -463,7 +496,7 @@ registerRoot(RemotionRoot);`;
       try {
         await fs.access(path.join(projectPath, 'package.json'));
       } catch {
-        await this.setupRemotionEnvironment();
+        await this.setupRemotionEnvironment(undefined);
       }
 
       // Use proper path quoting for the spawn command
@@ -492,7 +525,7 @@ registerRoot(RemotionRoot);`;
         content: [
           {
             type: 'text',
-            text: `Failed to launch Remotion Studio: ${error.message}`,
+            text: `Failed to launch Remotion Studio: ${(error as Error).message}`,
           },
         ],
       };
@@ -593,23 +626,28 @@ registerRoot(RemotionRoot);`;
   }
 
   private async createRemotionComponent(
-    componentName: string,
-    code: string,
-    duration: number = 3
+    componentName: unknown,
+    code: unknown,
+    duration: unknown = 3
   ) {
     try {
       const projectPath = path.join(os.homedir(), '.claude-videos', 'remotion-workspace');
       const componentsPath = path.join(projectPath, 'src', 'components');
       
+      // Convert and validate parameters
+      const componentNameStr = componentName as string;
+      const codeStr = code as string;
+      const durationNum = Number(duration) || 3;
+      
       // Ensure components directory exists
       await fs.mkdir(componentsPath, { recursive: true });
 
       // 🔥 FIXED: Clean the code before saving
-      const cleanedCode = this.cleanRemotionCode(code, componentName);
+      const cleanedCode = this.cleanRemotionCode(codeStr, componentNameStr);
 
       // Validate the cleaned code
-      if (!cleanedCode.includes(componentName)) {
-        throw new Error(`Component code must contain the component name "${componentName}"`);
+      if (!cleanedCode.includes(componentNameStr)) {
+        throw new Error(`Component code must contain the component name "${componentNameStr}"`);
       }
 
       if (!cleanedCode.includes('export')) {
@@ -617,17 +655,17 @@ registerRoot(RemotionRoot);`;
       }
 
       // Create component file with cleaned code
-      const componentFile = path.join(componentsPath, `${componentName}.tsx`);
+      const componentFile = path.join(componentsPath, `${componentNameStr}.tsx`);
       await fs.writeFile(componentFile, cleanedCode);
 
       // Update Root.tsx to include new component
       const rootPath = path.join(projectPath, 'src', 'Root.tsx');
-      const frames = Math.floor(duration * 30); // 30 FPS
+      const frames = Math.floor(durationNum * 30); // 30 FPS
 
       let rootContent = await fs.readFile(rootPath, 'utf8');
       
       // Add import
-      const importLine = `import {${componentName}} from './components/${componentName}';`;
+      const importLine = `import {${componentNameStr}} from './components/${componentNameStr}';`;
       if (!rootContent.includes(importLine)) {
         rootContent = rootContent.replace(
           /import.*from.*['"];/g,
@@ -637,15 +675,15 @@ registerRoot(RemotionRoot);`;
 
       // Add composition
       const compositionElement = `      <Composition
-        id="${componentName}"
-        component={${componentName}}
+        id="${componentNameStr}"
+        component={${componentNameStr}}
         durationInFrames={${frames}}
         fps={30}
         width={1920}
         height={1080}
       />`;
 
-      if (!rootContent.includes(`id="${componentName}"`)) {
+      if (!rootContent.includes(`id="${componentNameStr}"`)) {
         rootContent = rootContent.replace(
           /(<Composition[\s\S]*?\/>)/g,
           (match) => `${match}\n${compositionElement}`
@@ -658,7 +696,7 @@ registerRoot(RemotionRoot);`;
         content: [
           {
             type: 'text',
-            text: `✅ Component "${componentName}" created successfully!\n\nDuration: ${duration} seconds (${frames} frames)\nLocation: ${componentFile}\nRegistered: Added to Root.tsx\n\nFeatures applied:\n• Automatic syntax error repair\n• Import statement validation\n• Template literal fixes\n• Proper TypeScript exports\n\nNext steps:\n• Launch Remotion Studio to preview your component\n• The component is ready for rendering and editing`,
+            text: `✅ Component "${componentNameStr}" created successfully!\n\nDuration: ${durationNum} seconds (${frames} frames)\nLocation: ${componentFile}\nRegistered: Added to Root.tsx\n\nFeatures applied:\n• Automatic syntax error repair\n• Import statement validation\n• Template literal fixes\n• Proper TypeScript exports\n\nNext steps:\n• Launch Remotion Studio to preview your component\n• The component is ready for rendering and editing`,
           },
         ],
       };
@@ -667,7 +705,7 @@ registerRoot(RemotionRoot);`;
         content: [
           {
             type: 'text',
-            text: `Failed to create component: ${error.message}`,
+            text: `Failed to create component: ${(error as Error).message}`,
           },
         ],
       };
@@ -721,22 +759,23 @@ registerRoot(RemotionRoot);`;
         content: [
           {
             type: 'text',
-            text: `Failed to list components: ${error.message}`,
+            text: `Failed to list components: ${(error as Error).message}`,
           },
         ],
       };
     }
   }
 
-  private async repairComponent(componentName: string) {
+  private async repairComponent(componentName: unknown) {
     try {
+      const componentNameStr = componentName as string;
       const projectPath = path.join(os.homedir(), '.claude-videos', 'remotion-workspace');
-      const componentFile = path.join(projectPath, 'src', 'components', `${componentName}.tsx`);
+      const componentFile = path.join(projectPath, 'src', 'components', `${componentNameStr}.tsx`);
 
       let content = await fs.readFile(componentFile, 'utf8');
       
       // 🔥 FIXED: Use comprehensive code cleaning
-      const cleanedContent = this.cleanRemotionCode(content, componentName);
+      const cleanedContent = this.cleanRemotionCode(content, componentNameStr);
       
       // Check if content was actually cleaned
       const wasChanged = content !== cleanedContent;
@@ -749,7 +788,7 @@ registerRoot(RemotionRoot);`;
           content: [
             {
               type: 'text',
-              text: `✅ Component "${componentName}" repaired successfully!\n\nRepairs applied:\n• Removed invalid syntax patterns\n• Fixed export statements\n• Cleaned documentation artifacts\n• Validated TypeScript syntax\n\nThe component is now ready for use in Remotion Studio.`,
+              text: `✅ Component "${componentNameStr}" repaired successfully!\n\nRepairs applied:\n• Removed invalid syntax patterns\n• Fixed export statements\n• Cleaned documentation artifacts\n• Validated TypeScript syntax\n\nThe component is now ready for use in Remotion Studio.`,
             },
           ],
         };
@@ -758,7 +797,7 @@ registerRoot(RemotionRoot);`;
           content: [
             {
               type: 'text',
-              text: `✅ Component "${componentName}" is already valid - no repairs needed!`,
+              text: `✅ Component "${componentNameStr}" is already valid - no repairs needed!`,
             },
           ],
         };
@@ -768,7 +807,212 @@ registerRoot(RemotionRoot);`;
         content: [
           {
             type: 'text',
-            text: `Failed to repair component: ${error.message}`,
+            text: `Failed to repair component: ${(error as Error).message}`,
+          },
+        ],
+      };
+    }
+  }
+
+  private async getAnimationGuidelines(type: string = 'essential-rules') {
+    const guidelines = {
+      'essential-rules': `🎬 ESSENTIAL ANIMATION RULES (MANDATORY):
+
+✅ **OVERLAPPING SCENES** - No empty screen time (15-frame overlaps)
+✅ **MOVEMENT + FADES** - Never fade-only transitions  
+✅ **QUICK TIMING** - 20-frame entries, 15-frame exits, 5-8 frame staggers
+✅ **PROPER SIZING** - 16px+ text, 18px+ badges, 20px+ buttons, 44px+ touch targets
+✅ **SAFE INTERPOLATION** - Always use bounds checking
+✅ **CUBIC EASING** - out for entries, in for exits
+
+Timeline Formula (10-second animation):
+- Scene 1: 0-80 frames    (0-2.7s)
+- Scene 2: 65-155 frames  (2.2-5.2s) - 15 frame overlap
+- Scene 3: 140-230 frames (4.7-7.7s) - 15 frame overlap  
+- Scene 4: 215-300 frames (7.2-10s)  - 15 frame overlap
+
+BANNED PATTERNS:
+❌ Empty screen time - Always overlap scenes
+❌ Fade-only transitions - Always combine with movement
+❌ Slow timing - Use 15-20 frame transitions max
+❌ Small text - 16px+ text, 44px+ touch targets
+❌ Hard cuts - Always use overlapping opacity transitions`,
+
+      'safe-patterns': `🔧 SAFE ANIMATION PATTERNS:
+
+const safeInterpolate = (frame: number, inputRange: [number, number], outputRange: [number, number], easing?: any) => {
+  const [inputStart, inputEnd] = inputRange;
+  const [outputStart, outputEnd] = outputRange;
+  if (inputEnd === inputStart) return outputStart;
+  if (frame <= inputStart) return outputStart;
+  if (frame >= inputEnd) return outputEnd;
+  return interpolate(frame, inputRange, outputRange, { easing });
+};
+
+const animations = {
+  scene1: {
+    opacity: safeInterpolate(frame, [0, 20], [0, 1], Easing.out(Easing.cubic)) * 
+             safeInterpolate(frame, [60, 75], [1, 0], Easing.in(Easing.cubic)),
+    entryY: safeInterpolate(frame, [0, 20], [20, 0], Easing.out(Easing.cubic)),
+    exitY: safeInterpolate(frame, [60, 75], [0, -20], Easing.in(Easing.cubic))
+  }
+};
+
+// Always check visibility before rendering
+{sceneVisibility.scene1 > 0.01 && <Scene1Content />}`,
+
+      'professional-template': `🎯 PROFESSIONAL ANIMATION TEMPLATE:
+
+import React from 'react';
+import { AbsoluteFill, useCurrentFrame, interpolate, Easing } from 'remotion';
+
+export const ProfessionalAnimation: React.FC = () => {
+  const frame = useCurrentFrame();
+  
+  const safeInterpolate = (frame: number, inputRange: [number, number], outputRange: [number, number], easing?: any) => {
+    const [inputStart, inputEnd] = inputRange;
+    const [outputStart, outputEnd] = outputRange;
+    if (inputEnd === inputStart) return outputStart;
+    if (frame <= inputStart) return outputStart;
+    if (frame >= inputEnd) return outputEnd;
+    return interpolate(frame, inputRange, outputRange, { easing });
+  };
+
+  const sceneVisibility = {
+    scene1: safeInterpolate(frame, [0, 20], [0, 1]) * safeInterpolate(frame, [60, 75], [1, 0]),
+    scene2: safeInterpolate(frame, [65, 85], [0, 1]) * safeInterpolate(frame, [140, 155], [1, 0]),
+    scene3: safeInterpolate(frame, [140, 160], [0, 1]) * safeInterpolate(frame, [215, 230], [1, 0])
+  };
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: '#000', fontFamily: 'Arial, sans-serif' }}>
+      {sceneVisibility.scene1 > 0.01 && (
+        <div style={{
+          opacity: sceneVisibility.scene1,
+          transform: \`translateY(\${safeInterpolate(frame, [0, 20], [20, 0])}px)\`,
+          fontSize: '18px', // Minimum readable size
+          padding: '20px',
+          minHeight: '44px' // Minimum touch target
+        }}>
+          Scene 1 Content
+        </div>
+      )}
+    </AbsoluteFill>
+  );
+};`,
+
+      'all': `🎬 Complete Animation Guidelines:
+
+ESSENTIAL RULES:
+✅ Overlapping scenes (15-frame overlaps)
+✅ Movement + fades (never fade-only)
+✅ Quick timing (20-frame entries, 15-frame exits)
+✅ Proper sizing (16px+ text, 44px+ targets)
+✅ Safe interpolation (bounds checking)
+✅ Cubic easing (out for entries, in for exits)
+
+SAFE INTERPOLATION FUNCTION:
+const safeInterpolate = (frame, inputRange, outputRange, easing) => {
+  const [inputStart, inputEnd] = inputRange;
+  if (inputEnd === inputStart) return inputRange[0];
+  if (frame <= inputStart) return outputRange[0];
+  if (frame >= inputEnd) return outputRange[1];
+  return interpolate(frame, inputRange, outputRange, { easing });
+};
+
+TIMELINE PATTERN:
+- Scene overlaps ensure no empty screen time
+- 15-frame overlaps between all scenes
+- Quick 20-frame entries, 15-frame exits
+- Use visibility checks: {visibility > 0.01 && <Content />}
+
+Always follow these patterns for professional results!`
+    };
+
+    const guideline = guidelines[type];
+    if (!guideline) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `❌ Unknown guideline type: "${type}"\n\nAvailable types:\n• essential-rules\n• safe-patterns\n• professional-template\n• all`,
+          },
+        ],
+      };
+    }
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `🎬 Animation Guidelines: ${type}\n\n${guideline}`,
+        },
+      ],
+    };
+  }
+
+  private async readGuidelinesFile(filename: string) {
+    if (!filename) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: '❌ filename is required',
+          },
+        ],
+      };
+    }
+
+    try {
+      // Find the package root directory (where this MCP server is installed)
+      const packageRoot = path.resolve(__dirname, '..', '..');
+      const guidelinesDir = path.join(packageRoot, 'claude-dev-guidelines');
+      const filePath = path.join(guidelinesDir, filename);
+      
+      // Check if guidelines directory exists
+      if (!await fs.access(guidelinesDir).then(() => true).catch(() => false)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `❌ Guidelines directory not found at: ${guidelinesDir}\n\nTry reinstalling the rough-cuts-mcp package.`,
+            },
+          ],
+        };
+      }
+      
+      // List available files if the specific file doesn't exist
+      if (!await fs.access(filePath).then(() => true).catch(() => false)) {
+        const files = await fs.readdir(guidelinesDir);
+        const mdFiles = files.filter(file => file.endsWith('.md'));
+        
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `❌ Guidelines file "${filename}" not found.\n\n📁 Available files:\n${mdFiles.map(file => `• ${file}`).join('\n')}\n\nDirectory: ${guidelinesDir}`,
+            },
+          ],
+        };
+      }
+      
+      // Read the file content
+      const fileContent = await fs.readFile(filePath, 'utf-8');
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `📖 Guidelines: ${filename}\n\n${fileContent}`,
+          },
+        ],
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `❌ Failed to read guidelines file: ${(error as Error).message}`,
           },
         ],
       };
