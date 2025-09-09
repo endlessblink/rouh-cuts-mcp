@@ -4,7 +4,11 @@
 
 ## Installation
 
-### Quick Start (Recommended)
+### Prerequisites
+- Node.js 18+ ([download here](https://nodejs.org))
+- Claude Desktop installed
+
+### Quick Start (Recommended) - 30 seconds
 ```bash
 npx -y @endlessblink/rough-cuts-mcp@latest
 ```
