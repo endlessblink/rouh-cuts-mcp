@@ -5,6 +5,7 @@
 
 # Development Documentation (keep repository only)
 docs/
+**/config/
 *.md
 !README.md
 

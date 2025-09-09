@@ -47,6 +47,8 @@ Docs/logs/
 **/*.log
 docs/sessions/
 docs/research/
+docs/config/
+**/config/
 
 # NPM and package managers
 npm-debug.log*
