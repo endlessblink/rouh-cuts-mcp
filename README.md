@@ -1,211 +1,189 @@
-# 🎬 Rough Cuts MCP - Zero-Setup Video Generation
+# 🎬 Rough Cuts MCP - Zero-Setup Remotion Video Generation 
 
-**The ONLY video generation tool that requires ZERO manual setup!**
+**Professional AI-powered video creation for Claude Desktop with automatic setup and built-in animation guidelines.**
 
-## ✨ What This Does
+## ⚡ Quick Start (Zero Configuration Required)
 
-- ✅ **Auto-creates Remotion projects** when none exist at `~/Claude-Videos/remotion-project`
-- ✅ **Auto-installs all dependencies** (Remotion, React, TypeScript)
-- ✅ **Works from anywhere** - no manual navigation needed  
-- ✅ **Generates professional video components** with Claude AI
-- ✅ **Launches preview studio** automatically
-- ✅ **Renders to MP4** with one command
-- ✅ **Copies animation guidelines** for professional quality
-
-## 🚀 Installation (30 seconds)
-
-### Prerequisites
-- Node.js 18+ ([download here](https://nodejs.org))
-- Claude Desktop installed
-
-### One-Command Global Install
-
+### **Option 1: NPX (Recommended) - Instant Setup**
 ```bash
-# Install globally - works from anywhere
+npx -y @endlessblink/rough-cuts-mcp@latest
+```
+**That's it!** Automatically configures Claude Desktop and you're ready to create videos.
+
+### **Option 2: Global Install**
+```bash
 npm install -g @endlessblink/rough-cuts-mcp
 ```
 
-**That's it!** The package will:
-1. ✅ **Auto-configure Claude Desktop** (any OS)
-2. ✅ **Build the MCP server** 
-3. ✅ **Set up project structure**
-4. ✅ **Install all dependencies**
-
-Just restart Claude Desktop and start creating videos!
-
-## 🎯 Auto-Installation Magic
-
-### **First Use Experience:**
-1. **User**: *"Create a dynamic product showcase video"*
-2. **MCP Detects**: No Remotion project exists
-3. **Auto-Creates**: `~/Claude-Videos/remotion-project/`
-4. **Auto-Installs**: All Remotion dependencies
-5. **Auto-Copies**: Professional animation guidelines  
-6. **Creates**: Welcome video component
-7. **Ready**: Claude generates your requested video
-
-### **Subsequent Uses:**
-- ⚡ **Instant**: Uses existing project
-- 🔄 **Smart**: Auto-detects any Remotion project in current directory
-- 📁 **Flexible**: Works with existing projects or creates new ones
-
-## 💡 Usage Examples
-
-Just ask Claude naturally - **no setup commands needed**:
-
-- 🎥 **"Create a GitHub profile showcase video"**
-- 🚀 **"Make an animated logo intro for my startup"** 
-- 📊 **"Generate a data visualization video with charts"**
-- 🎨 **"Create a dynamic text animation for social media"**
-- 📱 **"Make a product demo video with smooth transitions"**
-
-## 🎬 Complete Workflow
-
-### **Step 1: Ask Claude**
-```
-User: "Create a sleek company intro video with our logo"
+### **Option 3: Manual Setup (Fallback)**
+If automatic setup fails, add this to your `claude_desktop_config.json`:
+```json
+{
+  "mcpServers": {
+    "rough-cuts-mcp": {
+      "command": "npx",
+      "args": ["-y", "@endlessblink/rough-cuts-mcp@latest"]
+    }
+  }
+}
 ```
 
-### **Step 2: Auto-Installation (First Time Only)**
+## 🚀 What This Package Does
+
+### **Completely Automatic**
+- ✅ **Auto-detects** Node.js, npm, and system configuration
+- ✅ **Auto-configures** Claude Desktop (no manual JSON editing)  
+- ✅ **Auto-creates** Remotion projects when needed
+- ✅ **Auto-installs** all dependencies and requirements
+- ✅ **Auto-launches** Remotion Studio for preview and rendering
+
+### **Professional Animation Quality**
+- 🎯 **Built-in Guidelines** - Professional animation rules loaded automatically
+- 🔧 **Safe Patterns** - Bulletproof interpolation and timing functions  
+- ⚡ **Quick Templates** - Professional templates with overlapping scenes
+- 🎨 **Syntax Repair** - Automatically fixes animation code issues
+- 📚 **Best Practices** - Follows industry standards for motion graphics
+
+### **Cross-Platform Support**  
+- 🖥️ **Windows** - Full support with enhanced path detection
+- 🍎 **macOS** - Native support with proper app bundle detection
+- 🐧 **Linux** - Complete compatibility with standard distributions
+
+## 🎯 Usage with Claude
+
+After installation, simply ask Claude:
+
+### **Example Prompts:**
 ```
-🎬 No Remotion project found. Creating one automatically...
-📁 Creating Remotion project at: ~/Claude-Videos/remotion-project
-📦 Installing Remotion dependencies...
-📋 Copied animation guidelines to project
-✅ Remotion project created successfully!
-✅ Component "CompanyIntro" created successfully!
-```
-
-### **Step 3: Preview & Render**
-```
-User: "Launch Remotion Studio to preview it"
-Claude: ✅ Remotion Studio launched on port 3000
-
-User: "Render the video to MP4"
-Claude: ✅ Video rendered successfully to: ~/Claude-Videos/remotion-project/out/CompanyIntro.mp4
-```
-
-## 🛡️ Professional Quality Built-In
-
-### **Bulletproof Animation System:**
-- ✅ **No text overlap** - Scene-based rendering prevents layout issues
-- ✅ **Professional transitions** - Overlapping scenes with smooth timing
-- ✅ **Proper sizing** - All text 16px+, touch targets 44px+
-- ✅ **Safe interpolation** - Bounds checking prevents animation errors
-- ✅ **Modern motion design** - Directional slides, scales, strategic fades
-
-### **Auto-Included Guidelines:**
-- 📋 **Animation patterns** for any content type
-- 🎯 **Layout rules** that prevent common mistakes  
-- ⚡ **Quick templates** for immediate use
-- 🏆 **Professional standards** built-in
-
-## 📂 Auto-Generated Project Structure
-
-```
-~/Claude-Videos/remotion-project/
-├── package.json              # Remotion dependencies (auto-installed)
-├── tsconfig.json             # TypeScript config  
-├── remotion.config.ts        # Video settings
-├── claude-dev-guidelines/    # Professional animation rules
-├── src/
-│   ├── index.ts             # Entry point
-│   ├── Root.tsx             # Composition registry
-│   └── components/          # Your video components
-│       └── WelcomeVideo.tsx # Auto-generated starter
-└── out/                     # Rendered videos (auto-created)
+"Create a dynamic product showcase video"
+"Make an animated logo intro with smooth transitions"  
+"Generate a professional demo video for my SaaS app"
+"Build a GitHub repository showcase animation"
+"Create a video explaining our company's services"
 ```
 
-## 🔧 Advanced Features
+### **Automatic Features:**
+- 🏗️ **Project Setup** - Creates workspace at `~/Claude-Videos/` automatically
+- 📱 **Studio Launch** - Opens preview at `http://localhost:3000`
+- 🎬 **Professional Results** - Follows animation best practices automatically
+- 🔧 **Error Recovery** - Fixes syntax and timing issues automatically
 
-### **Smart Project Detection:**
-1. **Current directory** - Looks for existing Remotion projects
-2. **Parent directories** - Searches upward for projects
-3. **Default location** - Uses `~/Claude-Videos/remotion-project`
-4. **Auto-creation** - Creates new project if none found
+## 🛠️ Available MCP Tools
 
-### **Dependency Management:**
-- **Auto-installs** Remotion, React, TypeScript on first use
-- **Checks existence** of node_modules before operations
-- **Graceful fallback** if npm install fails
-- **Version pinning** for stability
+### **Core Animation Tools:**
+- `check_environment` - Verify system requirements
+- `setup_remotion_environment` - Create new Remotion projects  
+- `create_remotion_component` - Generate animation components
+- `launch_remotion_studio` - Start preview server
+- `list_components` - Show available animations
 
-### **Professional Output:**
-- **1920x1080 HD** resolution
-- **30fps** smooth playback  
-- **Video-optimized** typography (no tiny text)
-- **Cross-platform** MP4 export
-- **Efficient rendering** with Remotion CLI
+### **Enhanced Quality Tools:**
+- `get_animation_guidelines` - **NEW!** Built-in professional animation rules
+- `repair_component` - Auto-fix syntax and timing issues
+- `read_guidelines_file` - Access extended documentation
 
-## 🎯 Supported Video Types
+## 📋 Animation Guidelines (Built-In)
 
-- 🎨 **GitHub showcases** with real repository data
-- 📊 **Data visualizations** with animated charts
-- 🚀 **Product demos** with smooth transitions  
-- 💼 **Corporate presentations** with professional styling
-- 🎮 **Gaming content** with particle effects
-- 📱 **Social media** content (Instagram, TikTok, YouTube)
-- 🏢 **Brand videos** with company colors and fonts
-- 📈 **Analytics dashboards** with live data
-- 🎪 **Event promotions** with dynamic text
-- 🎓 **Educational content** with clear explanations
+The MCP includes professional animation guidelines that ensure:
 
-## 🔄 Cross-Platform Auto-Configuration
+### **✅ Professional Standards:**
+- **Overlapping Scenes** - No empty screen time (15-frame overlaps)
+- **Movement + Fades** - Never fade-only transitions
+- **Quick Timing** - 20-frame entries, 15-frame exits
+- **Proper Sizing** - 16px+ text, 44px+ touch targets
+- **Safe Interpolation** - Bounds checking for all animations
+- **Cubic Easing** - Professional easing curves
 
-### **Windows:**
-- **Config**: `%APPDATA%\Claude\claude_desktop_config.json`
-- **Projects**: `%USERPROFILE%\Claude-Videos\remotion-project`
+### **❌ Banned Patterns Automatically Avoided:**
+- Empty screen time during transitions
+- Fade-only transitions without movement  
+- Slow timing (>20 frame transitions)
+- Small text (<16px) and touch targets (<44px)
+- Hard cuts without smooth transitions
 
-### **macOS:**
-- **Config**: `~/Library/Application Support/Claude/claude_desktop_config.json`  
-- **Projects**: `~/Claude-Videos/remotion-project`
+## 🔧 Requirements
 
-### **Linux:**
-- **Config**: `~/.config/claude/claude_desktop_config.json`
-- **Projects**: `~/Claude-Videos/remotion-project`
+- **Node.js** 18.0.0 or higher
+- **npm** 8.0.0 or higher  
+- **Claude Desktop** (any recent version)
+- **Platform:** Windows, macOS, or Linux
 
 ## 🚨 Troubleshooting
 
-### **"Node.js not found"**
-- Install Node.js 18+ from [nodejs.org](https://nodejs.org)
-- Restart your terminal/Claude Desktop
+### **Setup Issues:**
+```bash
+# Check Node.js version
+node --version  # Should be 18.0.0+
 
-### **"Permission denied on config"**
-- Run with administrator/sudo privileges
-- Or manually edit the Claude config file (shown in error)
+# Restart Claude Desktop after installation
+# Close completely and reopen
 
-### **"Dependencies failed to install"**
-- Check internet connection
-- Run `npm install` manually in the project directory
-- Ensure you have npm 8+ (`npm --version`)
+# Test MCP connection
+# Ask Claude: "Check my video creation environment"
+```
 
-### **"No Remotion project found"**
-- The MCP will auto-create one at `~/Claude-Videos/remotion-project`
-- Or create your own with `npx create-remotion-video@latest`
-- Ensure the project has Remotion in package.json
+### **Permission Issues:**
+```bash
+# Windows: Run as Administrator if needed
+# macOS/Linux: Ensure npm global permissions are correct
+npm config get prefix  # Check npm global directory
+```
 
-## 🎯 What Makes This Special
+### **Manual Configuration:**
+If automatic setup fails, the installer creates `rough-cuts-mcp-config.json` with manual instructions.
 
-### **🤖 AI-First Design**
-Built specifically for Claude AI video generation with smart defaults
+## 📊 System Compatibility
 
-### **🚀 Zero-Touch Setup**  
-From npm install to video creation in under 2 minutes
+### **Tested Platforms:**
+- ✅ Windows 10/11 (x64, ARM64)
+- ✅ macOS 12+ (Intel, Apple Silicon)  
+- ✅ Ubuntu 20.04+ (x64, ARM64)
+- ✅ Debian 11+ (x64, ARM64)
+- ✅ CentOS/RHEL 8+ (x64)
 
-### **🎬 Professional Quality**
-Follows Remotion best practices automatically with bulletproof patterns
+### **Tested Node.js Versions:**
+- ✅ Node.js 18.x (LTS)
+- ✅ Node.js 20.x (LTS)  
+- ✅ Node.js 22.x (Current)
 
-### **🔄 Universal Compatibility**
-Works with existing Remotion projects or creates new ones seamlessly
+## 🎯 Professional Results
 
-### **📱 Complete Ecosystem**
-Live preview + rendering + guidelines + templates in one package
+Following the built-in guidelines ensures:
+- 🏆 **No text overlap** during transitions
+- ⚡ **No empty screen time** - always engaging
+- 📱 **Proper sizing** - clearly readable on all devices
+- 🎭 **Smooth motion** - professional cinematic feel
+- ⚡ **Fast performance** - transform-only animations
+- 🎨 **Consistent quality** - industry-standard patterns
+
+## 🆘 Support & Documentation
+
+### **Getting Help:**
+- 📖 **Built-in Guidelines** - Use `get_animation_guidelines()` in Claude
+- 🐛 **Issues** - Report at [GitHub Issues](https://github.com/endlessblink/rough-cuts-mcp/issues)
+- 💬 **Discussions** - Join [GitHub Discussions](https://github.com/endlessblink/rough-cuts-mcp/discussions)
+
+### **Advanced Usage:**
+- 📁 **Custom Projects** - Specify project paths: `setup_remotion_environment("/custom/path")`
+- 🎛️ **Studio Options** - Custom ports: `launch_remotion_studio(3001)`
+- 🔧 **Repair Tools** - Fix components: `repair_component("MyAnimation")`
+
+## 📄 License
+
+MIT License - See [LICENSE](LICENSE) for details.
+
+## 🙏 Credits
+
+Built with:
+- [Remotion](https://remotion.dev) - React-based video framework
+- [Model Context Protocol](https://modelcontextprotocol.io) - AI integration standard  
+- [Claude Desktop](https://claude.ai) - AI assistant platform
 
 ---
 
-## 🏆 Success Story
+**🎬 Start creating professional videos with AI assistance in under 60 seconds!**
 
-**Before**: Complex Remotion setup, manual configuration, layout issues  
-**After**: `npm install -g @endlessblink/rough-cuts-mcp` → "Create a video" → Professional MP4 ready!
-
-**Ready to create amazing videos with AI?** Install now and ask Claude to make your first video! 🎬
+```bash
+npx -y @endlessblink/rough-cuts-mcp@latest
+# Then ask Claude: "Create my first professional video"
+```

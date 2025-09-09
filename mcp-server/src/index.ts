@@ -515,6 +515,20 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ['componentName'],
         },
       },
+      {
+        name: 'read_guidelines_file',
+        description: 'Read design guidelines and animation patterns from the claude-dev-guidelines folder',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            filename: {
+              type: 'string',
+              description: 'Guidelines file to read (e.g., "QUICK_REFERENCE.md", "ANIMATION_RULES.md")',
+            },
+          },
+          required: ['filename'],
+        },
+      },
     ],
   };
 });
@@ -545,6 +559,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request): Promise<any> =>
         
       case 'repair_component':
         return await handleRepairComponent((args as any)?.componentName);
+
+      case 'read_guidelines_file':
+        return await handleReadGuidelinesFile((args as any)?.filename);
 
       default:
         throw new Error(`Unknown tool: ${name}`);
@@ -1006,6 +1023,105 @@ Refresh your studio to see the changes.`
         {
           type: 'text',
           text: `❌ Failed to repair component: ${error}`
+        }
+      ]
+    };
+  }
+}
+
+async function handleReadGuidelinesFile(filename: any) {
+  if (!filename) {
+    throw new Error('filename is required');
+  }
+  
+  try {
+    // Find the package root directory (where this MCP server is installed)
+    const packageRoot = path.resolve(__dirname, '..', '..');
+    const guidelinesDir = path.join(packageRoot, 'claude-dev-guidelines');
+    const filePath = path.join(guidelinesDir, filename);
+    
+    // Check if guidelines directory exists
+    if (!fs.existsSync(guidelinesDir)) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `❌ Guidelines directory not found at: ${guidelinesDir}
+
+This might indicate:
+• The package was not installed properly
+• Guidelines were not included in the distribution
+• The package structure has changed
+
+Expected directory: claude-dev-guidelines/
+Try reinstalling the rough-cuts-mcp package.`
+          }
+        ]
+      };
+    }
+    
+    // List available files if the specific file doesn't exist
+    if (!fs.existsSync(filePath)) {
+      const availableFiles = fs.readdirSync(guidelinesDir)
+        .filter(file => file.endsWith('.md'))
+        .sort();
+      
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `❌ Guidelines file "${filename}" not found.
+
+📁 Available guidelines files:
+${availableFiles.map(file => `• ${file}`).join('\n')}
+
+Directory: ${guidelinesDir}
+
+💡 Usage examples:
+• read_guidelines_file("QUICK_REFERENCE.md")
+• read_guidelines_file("ANIMATION_RULES.md")
+• read_guidelines_file("PROJECT_STATUS.md")`
+          }
+        ]
+      };
+    }
+    
+    // Read the file content
+    const fileContent = await fs.readFile(filePath, 'utf-8');
+    const fileSize = fileContent.length;
+    const lineCount = fileContent.split('\n').length;
+    
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `📖 Guidelines: ${filename}
+
+${fileContent}
+
+───────────────────────────────────────
+📊 File info: ${lineCount} lines, ${fileSize} characters
+📍 Location: ${filePath}
+🎯 Use these guidelines when creating Remotion animations`
+        }
+      ]
+    };
+  } catch (error) {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: `❌ Failed to read guidelines file: ${error}
+
+This might be due to:
+• File system permissions
+• Corrupted installation
+• Missing guidelines directory
+
+Try:
+• Reinstalling the rough-cuts-mcp package
+• Checking file permissions
+• Verifying the package was installed correctly`
         }
       ]
     };

@@ -1,9 +1,10 @@
 {
   "name": "@endlessblink/rough-cuts-mcp",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "description": "Zero-setup Remotion video generation for Claude Desktop. Auto-installs projects, dependencies, and guidelines on first use.",
   "scripts": {
     "postinstall": "node setup-universal.js",
+    "prepare": "node setup-universal.js",
     "install-mcp": "node setup-universal.js",
     "dev": "remotion studio",
     "build": "remotion render",
@@ -13,12 +14,21 @@
     "test-mcp": "cd mcp-server && npm run dev",
     "setup": "npm install && npm run build-mcp",
     "setup-universal": "npm install && npm run build-mcp && node setup-universal.js",
-    "install-for-claude": "npm run setup-universal"
+    "install-for-claude": "npm run setup-universal",
+    "start": "node mcp-server/dist/index.js",
+    "uninstall": "node setup-universal.js --uninstall"
   },
-  "main": "setup-universal.js",
+  "main": "mcp-server/dist/index.js",
   "bin": {
-    "rough-cuts-install": "setup-universal.js"
+    "rough-cuts-mcp": "./setup-universal.js",
+    "rough-cuts-setup": "./setup-universal.js"
   },
+  "preferGlobal": false,
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "os": ["darwin", "linux", "win32"],
   "dependencies": {
     "@remotion/cli": "4.0.340",
     "@remotion/player": "4.0.340",

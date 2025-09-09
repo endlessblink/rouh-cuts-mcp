@@ -5,7 +5,6 @@
 
 # Development Documentation (keep repository only)
 docs/
-claude-dev-guidelines/
 *.md
 !README.md
 
