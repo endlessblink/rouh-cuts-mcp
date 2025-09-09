@@ -815,7 +815,7 @@ registerRoot(RemotionRoot);`;
   }
 
   private async getAnimationGuidelines(type: string = 'essential-rules') {
-    const guidelines = {
+    const guidelines: Record<string, string> = {
       'essential-rules': `🎬 ESSENTIAL ANIMATION RULES (MANDATORY):
 
 ✅ **OVERLAPPING SCENES** - No empty screen time (15-frame overlaps)
