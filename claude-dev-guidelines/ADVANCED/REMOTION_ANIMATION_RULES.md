@@ -8,6 +8,7 @@
 - ✅ **Movement + fades** - Never fade-only transitions
 - ✅ **Quick timing** - 20-frame entries, 15-frame exits
 - ✅ **Proper sizing** - 16px+ text, 18px+ badges, 20px+ buttons, 44px+ touch targets
+- ✅ **Professional typography** - Use modern sans-serif fonts with proper hierarchy
 - ✅ **Staggered elements** - 5-8 frame delays within scenes
 - ✅ **Safe interpolation** - Always use bounds checking
 - ✅ **Cubic easing** - out for entries, in for exits
@@ -19,6 +20,105 @@
 // Scene 2: 65-155 frames  (2.2-5.2s) - 15 frame overlap
 // Scene 3: 140-230 frames (4.7-7.7s) - 15 frame overlap  
 // Scene 4: 215-300 frames (7.2-10s)  - 15 frame overlap
+```
+
+### **Professional Typography System (MANDATORY):**
+
+Create a separate `typography.ts` file with these definitions:
+
+```typescript
+// typography.ts - Import this in every component
+export const FONT_STACKS = {
+  // Primary recommended stack
+  primary: '"Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif',
+  
+  // Alternative premium options (choose ONE per project)
+  modern: '"Satoshi", "Inter", -apple-system, sans-serif',          // Clean, geometric
+  tech: '"JetBrains Mono", "SF Mono", "Monaco", monospace',        // For code/tech content
+  elegant: '"Poppins", "Nunito Sans", "Inter", sans-serif',        // Friendly, approachable
+  minimal: '"Neue Haas Grotesk", "Helvetica Now", sans-serif',     // Swiss minimalism
+  corporate: '"Circular", "Gotham", "Proxima Nova", sans-serif'    // Professional/corporate
+};
+
+// Typography hierarchy using font stack references
+export const TYPOGRAPHY = {
+  display: {
+    fontFamily: FONT_STACKS.primary,
+    fontSize: '72px',
+    fontWeight: 800,
+    lineHeight: 1.1,
+    letterSpacing: '-0.02em'
+  },
+  h1: {
+    fontFamily: FONT_STACKS.primary,
+    fontSize: '48px',
+    fontWeight: 700,
+    lineHeight: 1.2,
+    letterSpacing: '-0.01em'
+  },
+  h2: {
+    fontFamily: FONT_STACKS.primary,
+    fontSize: '36px',
+    fontWeight: 600,
+    lineHeight: 1.3,
+    letterSpacing: '0em'
+  },
+  h3: {
+    fontFamily: FONT_STACKS.primary,
+    fontSize: '24px',
+    fontWeight: 600,
+    lineHeight: 1.4,
+    letterSpacing: '0em'
+  },
+  body: {
+    fontFamily: FONT_STACKS.primary,
+    fontSize: '18px',
+    fontWeight: 400,
+    lineHeight: 1.6,
+    letterSpacing: '0em'
+  },
+  small: {
+    fontFamily: FONT_STACKS.primary,
+    fontSize: '16px',
+    fontWeight: 400,
+    lineHeight: 1.5,
+    letterSpacing: '0.01em'
+  },
+  badge: {
+    fontFamily: FONT_STACKS.primary,
+    fontSize: '14px',
+    fontWeight: 500,
+    lineHeight: 1.3,
+    letterSpacing: '0.05em',
+    textTransform: 'uppercase' as const
+  }
+};
+
+// Container with font optimization
+export const FONT_CONTAINER_STYLES = {
+  fontFamily: FONT_STACKS.primary,
+  fontDisplay: 'swap' as const,
+  WebkitFontSmoothing: 'antialiased' as const,
+  MozOsxFontSmoothing: 'grayscale' as const,
+  textRendering: 'optimizeLegibility' as const
+};
+```
+
+### **Component Usage:**
+```typescript
+import { FONT_STACKS, TYPOGRAPHY, FONT_CONTAINER_STYLES } from './typography';
+
+// Use in component styles
+const containerStyles = {
+  ...FONT_CONTAINER_STYLES,
+  width: '100%',
+  height: '100%',
+  // other styles...
+};
+
+// Use typography hierarchy
+<h1 style={{...TYPOGRAPHY.h1, color: '#ffffff'}}>Title</h1>
+<p style={{...TYPOGRAPHY.body, color: '#cccccc'}}>Body text</p>
 ```
 
 ## 🚨 CRITICAL LAYOUT RULES - ALWAYS FOLLOW
@@ -237,6 +337,7 @@ const animations = {
 ```typescript
 import React from 'react';
 import { AbsoluteFill, useCurrentFrame, interpolate, Easing } from 'remotion';
+import { FONT_STACKS, TYPOGRAPHY, FONT_CONTAINER_STYLES } from './typography';
 
 const ComponentName: React.FC = () => {
   const frame = useCurrentFrame();
@@ -247,7 +348,7 @@ const ComponentName: React.FC = () => {
     const [outputStart, outputEnd] = outputRange;
     if (inputEnd === inputStart) return outputStart;
     if (frame <= inputStart) return outputStart;
-    if (frame >= inputEnd) return outputEnd;
+    if (frame >= inputEnd) return outputRange;
     return interpolate(frame, inputRange, outputRange, { easing });
   };
   
@@ -278,12 +379,12 @@ const ComponentName: React.FC = () => {
     scene3: animations.scene3.opacity
   };
   
-  // MANDATORY: Safe container styles
+  // MANDATORY: Safe container styles with professional typography
   const containerStyles = {
+    ...FONT_CONTAINER_STYLES,
     width: '100%',
     height: '100%',
     backgroundColor: '#0d1117', // Or your background color
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif',
     overflow: 'hidden'
   };
   
@@ -308,9 +409,13 @@ const ComponentName: React.FC = () => {
             opacity: sceneVisibility.scene1,
             transform: `translateY(${animations.scene1.entryY + animations.scene1.exitY}px)`
           }}>
-            {/* Scene 1 content with proper sizing */}
-            <h1 style={{ fontSize: '48px', margin: '0 0 20px 0' }}>Title</h1>
-            <p style={{ fontSize: '18px', lineHeight: 1.5 }}>Description</p>
+            {/* Scene 1 content with professional typography */}
+            <h1 style={{...TYPOGRAPHY.h1, color: '#ffffff', margin: '0 0 24px 0'}}>
+              Title
+            </h1>
+            <p style={{...TYPOGRAPHY.body, color: '#cccccc', margin: 0}}>
+              Description
+            </p>
           </div>
         </div>
       )}

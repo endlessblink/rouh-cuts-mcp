@@ -1,58 +1,95 @@
-# 📁 Claude Development Guidelines
-**Organized guidelines for consistent Remotion development**
+# 📋 ANIMATION GUIDELINES OVERVIEW
+**Simple guide to the animation configuration system**
 
-## 📋 **Files in this folder:**
+## 🎯 FOR NON-TECHNICAL USERS
 
-### **🚀 QUICK_REFERENCE.md**
-- **Purpose:** Copy-paste into new Claude chats
-- **Contains:** Essential rules and MCP commands
-- **Use when:** Starting new animation development
+### **What You Can Control:**
+- **Fonts:** Choose from 6 different text styles (modern, elegant, tech, etc.)
+- **Text Size:** Make all text bigger or smaller with one setting
+- **Colors:** Change text colors, highlights, and background gradients
+- **Speed:** Control how fast animations appear and disappear
+- **Spacing:** Adjust gaps between elements
 
-### **🎬 REMOTION_ANIMATION_RULES.md** 
-- **Purpose:** Comprehensive animation layout guidelines
-- **Contains:** Safe patterns, banned practices, templates
-- **Use when:** Creating or debugging animations
+### **Main File to Edit:**
+**`PROJECT_CONFIG.md`** - This is your control panel. Change values here to update the entire video.
 
-### **📊 PROJECT_STATUS.md**
-- **Purpose:** Current project state and capabilities
-- **Contains:** Available components, MCP functions, achievements
-- **Use when:** Understanding what's already built
+### **How It Works:**
+1. Open `PROJECT_CONFIG.md`
+2. Find the setting you want to change
+3. Edit the value (follow the examples in the file)
+4. Save the file
+5. Your video automatically updates!
 
-### **📖 DETAILED_DESIGN_GUIDELINES.md**
-- **Purpose:** In-depth design principles and testing
-- **Contains:** Complete testing checklist, design patterns
-- **Use when:** Deep-diving into layout problems
+### **Common Changes:**
+- **Make text bigger:** Change `TYPOGRAPHY_SCALE: 1.0` to `TYPOGRAPHY_SCALE: 1.3`
+- **Use tech font:** Change `SELECTED_FONT_STACK: primary` to `SELECTED_FONT_STACK: tech`
+- **Blue highlight:** Change `accent: #a78bfa` to `accent: #3b82f6`
+- **Faster animations:** Change `ENTRY_SPEED: 20` to `ENTRY_SPEED: 10`
 
----
+## 🔧 FOR DEVELOPERS
 
-## 🎯 **How to Use These Guidelines**
+### **Technical Files:**
+- **`ADVANCED/ANIMATION_PATTERNS.md`** - Code templates and safety rules
+- **`ADVANCED/REMOTION_ANIMATION_RULES.md`** - Comprehensive animation guidelines
+- **`typography.ts`** - Parser functions and type definitions
+- **Component files** - Use the dynamic configuration system
 
-### **For New Chat Sessions:**
-1. **Start with** `QUICK_REFERENCE.md` - paste the rules
-2. **Reference** `PROJECT_STATUS.md` for current capabilities
-3. **Follow** `REMOTION_ANIMATION_RULES.md` when creating animations
+### **Implementation Pattern:**
+```typescript
+// Read configuration from guidelines
+const config = parseGuidelinesConfig(guidelinesContent);
 
-### **For Debugging Layout Issues:**
-1. **Check** `REMOTION_ANIMATION_RULES.md` for safe patterns
-2. **Reference** `DETAILED_DESIGN_GUIDELINES.md` for testing
-3. **Verify** scene-based rendering is being used
+// Generate dynamic styles
+const TYPOGRAPHY = generateTypography(
+  config.selectedFontStack,
+  config.typographyScale,
+  config.fontStacks,
+  config.baseSizes
+);
 
-### **For Understanding Project State:**
-1. **Read** `PROJECT_STATUS.md` for current components
-2. **Check** available MCP commands and capabilities
-3. **See** what templates are already built
+// Use in components
+<h1 style={{...TYPOGRAPHY.h1, color: config.colors.text.primary}}>
+  Dynamic Title
+</h1>
+```
 
----
+### **MCP Commands:**
+```typescript
+// Read user configuration
+rough-cuts-mcp:read_guidelines_file("PROJECT_CONFIG.md")
 
-## 🚨 **Critical Rules Summary**
+// Get developer patterns (if needed)
+rough-cuts-mcp:read_guidelines_file("ADVANCED/ANIMATION_PATTERNS.md")
 
-**Always enforce these in every animation:**
-- ✅ Scene-based rendering (only one scene visible)
-- ✅ Explicit grid layouts (no auto-fit)
-- ✅ Proper spacing (60px+ between sections)
-- ✅ Use bulletproof templates as starting points
-- ❌ Never multiple overlapping absolute elements
+// Create component
+rough-cuts-mcp:create_remotion_component(name, code, duration)
+```
 
----
+## 📁 FILE STRUCTURE
 
-**Keep these guidelines updated as the project evolves!**
+```
+claude-dev-guidelines/
+├── PROJECT_CONFIG.md        ← USER EDITS THIS (visual settings)
+├── README.md               ← THIS FILE (overview)
+└── ADVANCED/               ← DEVELOPER FILES (technical code)
+    ├── ANIMATION_PATTERNS.md
+    ├── REMOTION_ANIMATION_RULES.md
+    ├── QUICK_REFERENCE.md
+    └── TESTING_GUIDE.md
+```
+
+## 🎬 WORKFLOW
+
+### **For Content Creators/Designers:**
+1. Edit `PROJECT_CONFIG.md` only
+2. Change fonts, colors, sizes, timing
+3. Preview results in Remotion Studio
+4. No code knowledge required!
+
+### **For Developers:**
+1. Reference `ADVANCED/ANIMATION_PATTERNS.md` for code templates
+2. Build components using the dynamic configuration system
+3. Ensure all values come from `PROJECT_CONFIG.md`, not hardcoded
+4. Test that user changes in config file update the animations
+
+**🎯 The system separates visual configuration (user-friendly) from code implementation (developer-only).**

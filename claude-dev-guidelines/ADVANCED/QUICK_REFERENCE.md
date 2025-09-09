@@ -9,8 +9,29 @@
 - ✅ **MOVEMENT + FADES** - Never fade-only transitions  
 - ✅ **QUICK TIMING** - 20-frame entries, 15-frame exits, 5-8 frame staggers
 - ✅ **PROPER SIZING** - 16px+ text, 18px+ badges, 20px+ buttons, 44px+ touch targets
+- ✅ **PROFESSIONAL FONTS** - Use Inter/SF Pro Display sans-serif stack
 - ✅ **SAFE INTERPOLATION** - Always use bounds checking
 - ✅ **CUBIC EASING** - out for entries, in for exits
+```
+
+### **Professional Typography Stack:**
+```typescript
+// Create typography.ts file and import in components:
+import { FONT_STACKS, TYPOGRAPHY, FONT_CONTAINER_STYLES } from './typography';
+
+// Font stacks (choose one per project)
+FONT_STACKS.primary   // Inter, SF Pro Display, system fallbacks
+FONT_STACKS.modern    // Satoshi, Inter, system fallbacks  
+FONT_STACKS.elegant   // Poppins, Nunito Sans, Inter
+FONT_STACKS.minimal   // Neue Haas Grotesk, Helvetica Now
+FONT_STACKS.corporate // Circular, Gotham, Proxima Nova
+
+// Typography hierarchy usage
+<h1 style={{...TYPOGRAPHY.h1, color: '#fff'}}>Heading</h1>
+<p style={{...TYPOGRAPHY.body, color: '#ccc'}}>Body text</p>
+
+// Container with font optimization
+const containerStyles = {...FONT_CONTAINER_STYLES, width: '100%', height: '100%'};
 ```
 
 ### **Timeline Formula (10-second animation):**

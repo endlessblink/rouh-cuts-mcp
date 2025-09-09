@@ -23,6 +23,11 @@ import path from 'path';
 import { spawn, execSync } from 'child_process';
 import net from 'net';
 import os from 'os';
+import { fileURLToPath } from 'url';
+
+// ES module compatibility for __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // ================================
 // CONFIGURATION
@@ -55,7 +60,7 @@ function findExecutable(command: string) {
     if (fs.existsSync(fullPath)) {
       return {
         command,
-        fullPath,
+        fullPath: isWindows && fullPath.includes(' ') ? `"${fullPath}"` : fullPath,
         version: getExecutableVersion(fullPath, command)
       };
     }
@@ -72,7 +77,7 @@ function findExecutable(command: string) {
         const version = getExecutableVersion(candidatePath, command);
         return {
           command,
-          fullPath: candidatePath,
+          fullPath: isWindows && candidatePath.includes(' ') ? `"${candidatePath}"` : candidatePath,
           version
         };
       } catch (error) {
@@ -194,9 +199,9 @@ async function createRemotionProjectAt(projectPath: string): Promise<string> {
       
       if (isWindows) {
         command = 'cmd';
-        args = ['/c', `"${npxLocation.fullPath}" create-remotion-app@latest "${projectPath}" --template=blank`];
+        args = ['/c', `${npxLocation.fullPath} create-remotion-app@latest "${projectPath}" --template=blank`];
       } else {
-        command = npxLocation.fullPath;
+        command = npxLocation.fullPath.replace(/"/g, ''); // Remove quotes for Unix
         args = ['create-remotion-app@latest', projectPath, '--template=blank'];
       }
       
@@ -727,9 +732,9 @@ Troubleshooting:
     
     if (isWindows) {
       command = 'cmd';
-      args = ['/c', `"${npxLocation.fullPath}" remotion studio --port=${port}`];
+      args = ['/c', `${npxLocation.fullPath} remotion studio --port=${port}`];
     } else {
-      command = npxLocation.fullPath;
+      command = npxLocation.fullPath.replace(/"/g, ''); // Remove quotes for Unix
       args = ['remotion', 'studio', `--port=${port}`];
     }
     
