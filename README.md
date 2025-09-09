@@ -2,20 +2,19 @@
 
 **Professional AI-powered video creation for Claude Desktop with automatic setup and built-in animation guidelines.**
 
-## ⚡ Quick Start (Zero Configuration Required)
+## Installation
 
-### **Option 1: NPX (Recommended) - Instant Setup**
+### Quick Start (Recommended)
 ```bash
 npx -y @endlessblink/rough-cuts-mcp@latest
 ```
-**That's it!** Automatically configures Claude Desktop and you're ready to create videos.
 
-### **Option 2: Global Install**
+### Alternative: Global Install
 ```bash
 npm install -g @endlessblink/rough-cuts-mcp
 ```
 
-### **Option 3: Manual Setup (Fallback)**
+### Manual Setup (Fallback)
 If automatic setup fails, add this to your `claude_desktop_config.json`:
 ```json
 {
