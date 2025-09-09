@@ -3,7 +3,7 @@ node_modules/
 */node_modules/
 **/node_modules/
 
-# Build outputs
+# Build outputs  
 dist/
 build/
 out/
@@ -16,10 +16,17 @@ out/
 *.tmp
 *.temp
 *.cache
+.npmrc
 
-# Operating system
+# Operating system files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+Desktop.ini
 *.swp
 *.swo
 
@@ -27,34 +34,77 @@ Thumbs.db
 .vscode/
 .idea/
 *.code-workspace
+.vs/
+*.user
+*.suo
+*.userprefs
+*~
 
-# Sensitive documentation
+# Sensitive documentation and debugging
 Docs/debugging/
 Docs/logs/
 **/debugging/
 **/*.log
+docs/sessions/
+docs/research/
 
-# NPM
+# NPM and package managers
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
+.npm
+.eslintcache
+.yarn-integrity
+.pnp.*
+.yarn/
 
 # Runtime
 *.pid
 *.seed
 *.pid.lock
 
-# Development files not for NPM
-scripts/
+# Development files
 memories/
 tasks/
 *-backup/
 *-corrupted-backup/
 Docs/
+experiments/
+
+# Test and diagnostic files
 test-*.js
 test-*.bat
+test-*.cmd
+*-test.js
+*-diagnostics.js
+*diagnostic*.json
+detection_comparison_test.js
+nodejs_diagnostics.js
+
+# Platform-specific installation
 install.bat
 install.sh
+
+# Coverage and testing
+coverage/
+.nyc_output/
+*.lcov
+.jest/
+
+# Package development
+*.tgz
+*.tar.gz
+
+# Claude development context (keep private)
 .claude/
+
+# Remotion build artifacts
 out/
+.remotion/
+
+# Lock files for sub-packages
+mcp-server/package-lock.json
+
+# TypeScript incremental compilation
+*.tsbuildinfo

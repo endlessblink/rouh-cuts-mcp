@@ -1,0 +1,130 @@
+# ================================
+# NPM IGNORE - Rough Cuts MCP
+# Keep npm package lean and professional
+# ================================
+
+# Development Documentation (keep repository only)
+docs/
+claude-dev-guidelines/
+*.md
+!README.md
+
+# Development Configuration
+.claude/
+.vscode/
+.idea/
+*.code-workspace
+
+# Session and Debug Files
+SESSION-DROPOFF*.md
+*-DEBUG-*.md
+*-TEST-*.md
+*-RESULTS*.md
+*-STATUS*.md
+*-COMPLETE*.md
+PERPLEXITY-*.md
+IMPLEMENTATION-*.md
+WINDOWS-*.md
+E2E-*.md
+
+# Testing and Development Scripts
+test-*.js
+test-*.bat
+test-*.cmd
+detection_comparison_test.js
+nodejs_diagnostics.js
+node-diagnostic-report.json
+
+# Development Setup Files
+setup-windows.cmd
+install.js
+claude.md
+
+# Build and Cache (keep dist/ but exclude sources)
+mcp-server/src/
+mcp-server/node_modules/
+mcp-server/tsconfig.json
+mcp-server/package-lock.json
+src/Test*.tsx
+src/test-*.ts
+
+# Temporary and Log Files
+*.log
+*.tmp
+*.temp
+*.cache
+*.pid
+*.seed
+*.pid.lock
+
+# OS Generated Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Editor Backup Files
+*~
+*.swp
+*.swo
+*#
+.#*
+
+# Development Dependencies
+node_modules/
+*/node_modules/
+**/node_modules/
+
+# Build Artifacts (except MCP server dist)
+out/
+build/
+.remotion/
+*.tsbuildinfo
+
+# Environment Files
+.env*
+.npmrc
+
+# Version Control
+.git/
+.gitignore
+.gitattributes
+
+# Development Tools
+experiments/
+scripts/ 
+backups/
+*-backup/
+*-corrupted-backup/
+
+# Platform Specific
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Coverage and Testing
+coverage/
+.nyc_output/
+*.lcov
+
+# Package Development
+*.tgz
+*.tar.gz
+
+# NPM
+.npm
+.eslintcache
+
+# Yarn
+.yarn-integrity
+.pnp.*
+.yarn/
+
+# Documentation Development
+*.draft.md
+*.wip.md
