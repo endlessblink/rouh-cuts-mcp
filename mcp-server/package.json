@@ -1,6 +1,6 @@
 {
   "name": "rough-cuts-mcp-server",
-  "version": "1.0.0",
+  "version": "3.1.0",
   "description": "MCP Server for Remotion video generation with Claude Desktop",
   "type": "module",
   "main": "dist/index.js",

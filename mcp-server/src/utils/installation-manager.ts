@@ -54,7 +54,7 @@ export class RemotionInstallationManager {
       return {
         success: false,
         projectPath: projectDir,
-        error: error.message,
+        error: error instanceof Error ? error.message : String(error),
         details: 'Failed to setup Remotion environment'
       };
     }
@@ -140,7 +140,7 @@ Config.setCodec('h264');
       
       install.on('exit', (code) => {
         if (code === 0) {
-          resolve();
+          resolve(undefined);
         } else {
           reject(new Error(`npm install failed with code ${code}: ${errorOutput}`));
         }
@@ -211,7 +211,7 @@ Config.setCodec('h264');
         }, 10000);
       });
     } catch (error) {
-      throw new Error(`Remotion verification failed: ${error.message}`);
+      throw new Error(`Remotion verification failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
   

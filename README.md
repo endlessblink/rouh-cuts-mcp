@@ -22,7 +22,7 @@
 
 ```bash
 # Install globally - works from anywhere
-npm install -g @rough-cuts/mcp
+npm install -g @endlessblink/rough-cuts-mcp
 ```
 
 **That's it!** The package will:
@@ -206,6 +206,6 @@ Live preview + rendering + guidelines + templates in one package
 ## 🏆 Success Story
 
 **Before**: Complex Remotion setup, manual configuration, layout issues  
-**After**: `npm install -g @rough-cuts/mcp` → "Create a video" → Professional MP4 ready!
+**After**: `npm install -g @endlessblink/rough-cuts-mcp` → "Create a video" → Professional MP4 ready!
 
 **Ready to create amazing videos with AI?** Install now and ask Claude to make your first video! 🎬

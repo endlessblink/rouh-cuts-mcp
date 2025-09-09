@@ -1,14 +1,14 @@
 import React from 'react';
 import { Composition } from 'remotion';
 import GitHubProfileShowcase from './components/GitHubProfileShowcase';
-import AutoInstallTest from './components/AutoInstallTest';
-import AutoInstallationDemo from './components/AutoInstallationDemo';
+import { AutoInstallTest } from './components/AutoInstallTest';
+import { AutoInstallationDemo } from './components/AutoInstallationDemo';
 
 /**
  * Remotion Root Component
  * Registers all video compositions for the project
  */
-export const RemotionRoot: React.FC = () => {
+const RemotionRoot: React.FC = () => {
   return (
     <>
       <Composition
@@ -38,3 +38,5 @@ export const RemotionRoot: React.FC = () => {
     </>
   );
 };
+
+export default RemotionRoot;

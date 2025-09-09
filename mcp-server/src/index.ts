@@ -17,6 +17,7 @@ import {
 import fs from 'fs-extra';
 import path from 'path';
 import { spawn, execSync } from 'child_process';
+import net from 'net';
 import os from 'os';
 
 // ================================
@@ -24,19 +25,21 @@ import os from 'os';
 // ================================
 
 /**
- * Find executable across all platforms with fallback to common installation paths
+ * PROVEN SOLUTION: Cross-platform executable detection
+ * Based on Perplexity research for robust Node.js tool detection
  */
-function findExecutable(command) {
+function findExecutable(command: string) {
   const isWindows = process.platform === 'win32';
   const findCommand = isWindows ? 'where' : 'which';
   
   try {
     const result = execSync(`${findCommand} ${command}`, { 
       encoding: 'utf8',
-      env: process.env,
+      env: process.env,  // Use inherited environment
       timeout: 5000
     }).trim();
     
+    // On Windows, 'where' returns all matches, take the first one
     const fullPath = isWindows ? result.split('\n')[0] : result;
     
     if (fs.existsSync(fullPath)) {
@@ -71,7 +74,7 @@ function findExecutable(command) {
   throw new Error(`${command} not found in PATH or common installation locations`);
 }
 
-function getCommonExecutablePaths(command) {
+function getCommonExecutablePaths(command: string): string[] {
   const isWindows = process.platform === 'win32';
   const isMac = process.platform === 'darwin';
   
@@ -101,7 +104,7 @@ function getCommonExecutablePaths(command) {
   }
 }
 
-function getExecutableVersion(executablePath, command) {
+function getExecutableVersion(executablePath: string, command: string): string | undefined {
   try {
     const result = execSync(`"${executablePath}" --version`, {
       encoding: 'utf8',
@@ -117,18 +120,24 @@ function getExecutableVersion(executablePath, command) {
 /**
  * Create environment with proper PATH inheritance
  */
+/**
+ * PROVEN SOLUTION: Create environment with proper PATH inheritance
+ * Based on Perplexity research - this is the core fix for MCP server PATH issues
+ */
 function createInheritedEnvironment(additionalEnv = {}) {
   return {
-    ...process.env,
+    ...process.env,  // CRITICAL: Inherit ALL environment variables including PATH
+    // MCP-compliant output suppression
     npm_config_loglevel: 'error',
     npm_config_progress: 'false',
-    CI: 'true',
+    CI: 'true',  // Suppress interactive prompts
     ...additionalEnv
   };
 }
 
 /**
- * Validate that all required executables are available
+ * PROVEN SOLUTION: Simple environment validation using standard PATH detection
+ * Based on Perplexity research - keep it simple and reliable
  */
 function validateEnvironment() {
   const requiredExecutables = ['node', 'npm', 'npx'];
@@ -154,9 +163,8 @@ function validateEnvironment() {
 /**
  * Check if a port is available
  */
-async function checkPort(port) {
+async function checkPort(port: number): Promise<boolean> {
   return new Promise((resolve) => {
-    const net = require('net');
     const server = net.createServer();
     
     server.listen(port, () => {
@@ -273,13 +281,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return await handleCheckEnvironment();
         
       case 'setup_remotion_environment':
-        return await handleSetupEnvironment(args?.projectPath);
+        return await handleSetupEnvironment((args as any)?.projectPath);
         
       case 'launch_remotion_studio':
-        return await handleLaunchStudio(args?.port || 3000);
+        return await handleLaunchStudio((args as any)?.port || 3000);
         
       case 'create_remotion_component':
-        return await handleCreateComponent(args?.componentName, args?.code, args?.duration);
+        return await handleCreateComponent((args as any)?.componentName, (args as any)?.code, (args as any)?.duration);
         
       case 'list_components':
         return await handleListComponents();
@@ -292,7 +300,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       content: [
         {
           type: 'text',
-          text: `Error in ${name}: ${error.message}`
+          text: `Error in ${name}: ${error instanceof Error ? error.message : String(error)}`
         }
       ]
     };
@@ -336,7 +344,7 @@ async function handleCheckEnvironment() {
 /**
  * Setup Remotion environment with auto-installation
  */
-async function handleSetupEnvironment(customPath) {
+async function handleSetupEnvironment(customPath?: string) {
   const projectDir = customPath || DEFAULT_PROJECT_PATH;
   
   try {
@@ -365,7 +373,7 @@ async function handleSetupEnvironment(customPath) {
       content: [
         {
           type: 'text',
-          text: `❌ Setup failed: ${error.message}\n\nEnsure Node.js and npm are properly installed and accessible.`
+          text: `❌ Setup failed: ${error instanceof Error ? error.message : String(error)}\n\nEnsure Node.js and npm are properly installed and accessible.`
         }
       ]
     };
@@ -375,7 +383,7 @@ async function handleSetupEnvironment(customPath) {
 /**
  * Install new Remotion project
  */
-async function installRemotionProject(projectDir) {
+async function installRemotionProject(projectDir: string) {
   const npmLocation = findExecutable('npm');
   
   // Create package.json
@@ -417,6 +425,102 @@ Config.setOverwriteOutput(true);
     remotionConfig
   );
   
+  // Create TypeScript configuration
+  const tsConfig = {
+    compilerOptions: {
+      target: "ES2022",
+      lib: ["DOM", "ES6"],
+      allowJs: true,
+      skipLibCheck: true,
+      esModuleInterop: true,
+      allowSyntheticDefaultImports: true,
+      strict: true,
+      forceConsistentCasingInFileNames: true,
+      module: "ESNext",
+      moduleResolution: "node",
+      resolveJsonModule: true,
+      isolatedModules: true,
+      noEmit: true,
+      jsx: "react-jsx"
+    },
+    include: ["src"]
+  };
+  
+  await fs.writeFile(
+    path.join(projectDir, 'tsconfig.json'),
+    JSON.stringify(tsConfig, null, 2)
+  );
+  
+  // Create src directory and basic components
+  await fs.ensureDir(path.join(projectDir, 'src'));
+  
+  // Create Root component
+  const rootComponent = `import React from 'react';
+import {Composition} from 'remotion';
+import {MyComposition} from './Composition';
+
+const RemotionRoot: React.FC = () => {
+	return (
+		<>
+			<Composition
+				id="MyComposition"
+				component={MyComposition}
+				durationInFrames={150}
+				fps={30}
+				width={1920}
+				height={1080}
+			/>
+		</>
+	);
+};
+
+export default RemotionRoot;`;
+  
+  await fs.writeFile(
+    path.join(projectDir, 'src', 'Root.tsx'),
+    rootComponent
+  );
+  
+  // Create example composition
+  const composition = `import React from 'react';
+import {AbsoluteFill, interpolate, useCurrentFrame} from 'remotion';
+
+export const MyComposition: React.FC = () => {
+	const frame = useCurrentFrame();
+	const opacity = interpolate(frame, [0, 30], [0, 1]);
+
+	return (
+		<AbsoluteFill
+			style={{
+				justifyContent: 'center',
+				alignItems: 'center',
+				fontSize: 60,
+				backgroundColor: '#0099ff',
+				color: 'white',
+				opacity,
+			}}
+		>
+			Hello from Claude! 🎬
+		</AbsoluteFill>
+	);
+};`;
+  
+  await fs.writeFile(
+    path.join(projectDir, 'src', 'Composition.tsx'),
+    composition
+  );
+  
+  // Create index file
+  const indexFile = `import {registerRoot} from 'remotion';
+import RemotionRoot from './Root';
+
+registerRoot(RemotionRoot);`;
+  
+  await fs.writeFile(
+    path.join(projectDir, 'src', 'index.ts'),
+    indexFile
+  );
+  
   // Install dependencies
   await runNpmInstall(npmLocation.fullPath, projectDir);
 }
@@ -424,13 +528,34 @@ Config.setOverwriteOutput(true);
 /**
  * Run npm install with proper environment
  */
-async function runNpmInstall(npmPath, projectDir) {
+async function runNpmInstall(npmPath: string, projectDir: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const install = spawn(npmPath, ['install', '--silent'], {
+    // PROVEN SOLUTION: Use cmd wrapper for Windows paths with spaces
+    const isWindows = process.platform === 'win32';
+    
+    let command: string;
+    let args: string[];
+    
+    if (isWindows) {
+      // Use cmd /c to handle paths with spaces properly
+      command = 'cmd';
+      args = ['/c', `"${npmPath}" install --silent`];
+    } else {
+      command = npmPath;
+      args = ['install', '--silent'];
+    }
+    
+    const install = spawn(command, args, {
       cwd: projectDir,
-      env: createInheritedEnvironment(),
+      env: {
+        ...process.env,  // CRITICAL: Inherit all environment variables including PATH
+        // MCP-compliant output suppression
+        npm_config_loglevel: 'error',
+        npm_config_progress: 'false',
+        CI: 'true'  // Suppress interactive prompts
+      },
       stdio: ['ignore', 'pipe', 'pipe'],
-      shell: process.platform === 'win32'
+      shell: isWindows
     });
     
     let errorOutput = '';
@@ -442,7 +567,7 @@ async function runNpmInstall(npmPath, projectDir) {
     
     install.on('exit', (code) => {
       if (code === 0) {
-        resolve();
+        resolve(undefined);
       } else {
         reject(new Error(`npm install failed with code ${code}: ${errorOutput}`));
       }
@@ -470,7 +595,7 @@ async function handleLaunchStudio(port = 3000) {
     const isInstalled = await fs.pathExists(packageJsonPath);
     
     if (!isInstalled) {
-      const setupResult = await handleSetupEnvironment();
+      const setupResult = await handleSetupEnvironment(undefined);
       if (setupResult.content[0].text.includes('❌')) {
         return setupResult;
       }
@@ -492,22 +617,40 @@ async function handleLaunchStudio(port = 3000) {
     // Find npx executable
     const npxLocation = findExecutable('npx');
     
-    // Launch studio
-    const studio = spawn(npxLocation.fullPath, ['remotion', 'studio', `--port=${port}`], {
+    // PROVEN SOLUTION: MCP-compliant process management with proper path handling
+    const isWindows = process.platform === 'win32';
+    
+    let command: string;
+    let args: string[];
+    
+    if (isWindows) {
+      // Use cmd /c to handle paths with spaces properly
+      command = 'cmd';
+      args = ['/c', `"${npxLocation.fullPath}" remotion studio --port=${port}`];
+    } else {
+      command = npxLocation.fullPath;
+      args = ['remotion', 'studio', `--port=${port}`];
+    }
+    
+    const studio = spawn(command, args, {
       cwd: projectDir,
-      env: createInheritedEnvironment({
+      env: {
+        ...process.env,  // CRITICAL: Inherit all environment variables including PATH
+        // MCP-compliant output suppression
+        npm_config_loglevel: 'error',
+        npm_config_progress: 'false',
+        CI: 'true',  // Suppress interactive prompts
         REMOTION_STUDIO_PORT: port.toString(),
         NODE_ENV: 'development'
-      }),
-      stdio: ['ignore', 'pipe', 'pipe'],
-      shell: process.platform === 'win32',
-      detached: false
+      },
+      stdio: ['ignore', 'pipe', 'pipe'],  // Capture stdout/stderr
+      shell: isWindows  // Use shell on Windows
     });
     
     // Wait for studio to be ready
     const result = await waitForStudioReady(studio, port);
     
-    if (result.success) {
+    if ((result as any).success) {
       return {
         content: [
           {
@@ -517,11 +660,11 @@ async function handleLaunchStudio(port = 3000) {
         ]
       };
     } else {
-      let errorText = `❌ Failed to launch Remotion Studio\n\nError: ${result.error}\n\n`;
+      let errorText = `❌ Failed to launch Remotion Studio\n\nError: ${(result as any).error}\n\n`;
       
-      if (result.troubleshooting) {
+      if ((result as any).troubleshooting) {
         errorText += `Troubleshooting steps:\n`;
-        for (const step of result.troubleshooting) {
+        for (const step of (result as any).troubleshooting) {
           errorText += `  • ${step}\n`;
         }
       }
@@ -539,7 +682,7 @@ async function handleLaunchStudio(port = 3000) {
 /**
  * Wait for studio to be ready with intelligent detection
  */
-async function waitForStudioReady(studio, port) {
+async function waitForStudioReady(studio: any, port: number): Promise<any> {
   return new Promise((resolve) => {
     let output = '';
     let errorOutput = '';
@@ -551,7 +694,7 @@ async function waitForStudioReady(studio, port) {
       clearTimeout(timeout);
     };
     
-    studio.stdout?.on('data', (data) => {
+    studio.stdout?.on('data', (data: any) => {
       if (resolved) return;
       
       output += data.toString();
@@ -577,7 +720,7 @@ async function waitForStudioReady(studio, port) {
       }
     });
     
-    studio.stderr?.on('data', (data) => {
+    studio.stderr?.on('data', (data: any) => {
       errorOutput += data.toString();
       const errorStr = data.toString();
       
@@ -610,7 +753,7 @@ async function waitForStudioReady(studio, port) {
       }
     });
     
-    studio.on('error', (error) => {
+    studio.on('error', (error: any) => {
       if (resolved) return;
       cleanup();
       resolve({
@@ -624,7 +767,7 @@ async function waitForStudioReady(studio, port) {
       });
     });
     
-    studio.on('exit', (code, signal) => {
+    studio.on('exit', (code: any, signal: any) => {
       if (resolved) return;
       cleanup();
       
@@ -665,7 +808,7 @@ async function waitForStudioReady(studio, port) {
 /**
  * Handle launch errors with helpful messages
  */
-function handleLaunchError(error, port) {
+function handleLaunchError(error: any, port: number) {
   if (error.code === 'ENOENT') {
     return {
       content: [
@@ -701,7 +844,7 @@ function handleLaunchError(error, port) {
 /**
  * Create component (simplified for now)
  */
-async function handleCreateComponent(componentName, code, duration = 3) {
+async function handleCreateComponent(componentName: any, code: any, duration: number = 3) {
   if (!componentName || !code) {
     throw new Error('componentName and code are required');
   }

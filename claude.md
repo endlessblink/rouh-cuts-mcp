@@ -1,0 +1,1 @@
+Never build in wsl2 or ws2 for this project, ALWAYS in windows, Never create wsl2 paths

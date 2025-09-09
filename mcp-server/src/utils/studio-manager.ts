@@ -71,8 +71,7 @@ export class RemotionStudioManager {
           success: true,
           port,
           pid: studio.pid,
-          url: `http://localhost:${port}`,
-          ...result
+          url: `http://localhost:${port}`
         };
       } else {
         // Cleanup failed process

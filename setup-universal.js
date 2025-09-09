@@ -19,13 +19,46 @@ function getClaudeConfigPath() {
   }
 }
 
+function findNodeExecutable() {
+  const { execSync } = require('child_process');
+  
+  try {
+    if (os.platform() === 'win32') {
+      // On Windows, just use 'node' as it's in PATH after Node.js installation
+      const result = execSync('where node', { encoding: 'utf8' }).trim();
+      const nodePath = result.split('\n')[0]; // Take first result
+      console.log(`Found Node.js at: ${nodePath}`);
+      return 'node'; // Use 'node' command which works reliably on Windows
+    } else {
+      // Try to find node on Unix systems
+      const result = execSync('which node', { encoding: 'utf8' }).trim();
+      return result;
+    }
+  } catch (error) {
+    // Fallback to common paths
+    const commonPaths = os.platform() === 'win32' 
+      ? ['C:\\Program Files\\nodejs\\node.exe', 'C:\\nodejs\\node.exe']
+      : ['/usr/local/bin/node', '/usr/bin/node', '/bin/node'];
+    
+    for (const nodePath of commonPaths) {
+      if (fs.existsSync(nodePath)) {
+        return os.platform() === 'win32' ? 'node' : nodePath;
+      }
+    }
+    
+    return 'node'; // Fallback to PATH lookup
+  }
+}
+
 function setupClaudeConfig() {
   const mcpServerPath = path.join(__dirname, 'mcp-server', 'dist', 'index.js');
   const configPath = getClaudeConfigPath();
+  const nodeCommand = findNodeExecutable();
   
   console.log('🎬 Setting up Universal Rough Cuts MCP...');
   console.log(`📁 MCP Server: ${mcpServerPath}`);
   console.log(`⚙️  Config File: ${configPath}`);
+  console.log(`🚀 Node.js Command: ${nodeCommand}`);
   
   // Check if MCP server exists
   if (!fs.existsSync(mcpServerPath)) {
@@ -54,8 +87,9 @@ function setupClaudeConfig() {
   }
   
   config.mcpServers['rough-cuts-mcp'] = {
-    command: 'node',
-    args: [mcpServerPath]
+    command: nodeCommand,
+    args: [mcpServerPath],
+    cwd: path.dirname(mcpServerPath)
   };
   
   // Write configuration
