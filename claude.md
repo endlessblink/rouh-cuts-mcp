@@ -30,6 +30,28 @@ MCP servers communicate via JSON. Emojis break JSON parsing and cause:
 
 Always use plain ASCII text markers in square brackets instead. 
 
+# VERSION UPDATE CHECKLIST
+When updating version numbers for NPM publish, ALWAYS update ALL locations:
+
+## FILES TO UPDATE:
+1. **package.json** (root) - Main NPM package version  
+2. **mcp-server/package.json** - MCP server package version
+3. **mcp-server/src/index.ts** - Line ~36: `version: 'X.X.X'` in Server constructor
+4. **setup-universal.js** - Line ~17: `this.version = 'X.X.X'` in MCPAutoSetup class
+5. **test-e2e.js** - Line ~16: `this.version = 'X.X.X'` in RoughCutsMCPTester class
+
+## PROCESS:
+1. Update all 5 files with same version number
+2. Run `npm run build` in mcp-server directory  
+3. Commit with version tag (e.g., "v4.5.1: Description")
+4. Push to repository
+5. NPM publish should now work without version conflicts
+
+## SEARCH COMMAND:
+```bash
+grep -r "version.*[0-9]\+\.[0-9]\+\.[0-9]\+" --include="*.ts" --include="*.js" --include="*.json" . | grep -v node_modules | grep -v package-lock
+```
+
 
 
 # CRITICAL: Evidence-Based Development Rules
