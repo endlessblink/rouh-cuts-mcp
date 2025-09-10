@@ -59,17 +59,32 @@ export class RootTsxManager {
   }
 
   /**
-   * Create component with automatic Root.tsx management (corruption prevention)
+   * Create component with validation and automatic Root.tsx management (prevents undefined errors)
    */
   async addComponentSafely(componentName: string, componentCode: string, options: Partial<ComponentEntry>): Promise<void> {
     // Ensure components directory exists
     await fs.mkdir(this.componentsDir, { recursive: true });
     
-    // First, create the component file atomically
+    // 🔥 NEW: Pre-validate component code before saving
+    if (!this.validateComponentCode(componentCode, componentName)) {
+      throw new Error(`Component code validation failed for ${componentName}. Code must contain 'export default' and valid React component.`);
+    }
+    
+    // Create the component file atomically
     const componentPath = path.join(this.componentsDir, `${componentName}.tsx`);
     await this.atomicWrite(componentPath, componentCode);
     
-    // Then, update Root.tsx with automatic deduplication
+    // 🔥 NEW: Validate the saved component file before updating Root.tsx
+    const isValidFile = await this.validateComponent(componentPath);
+    if (!isValidFile) {
+      // Delete the invalid component file to prevent corruption
+      await fs.unlink(componentPath).catch(() => {});
+      throw new Error(`Component ${componentName} failed post-save validation. Component not added to Root.tsx.`);
+    }
+    
+    console.log(`✅ Component ${componentName} validated and ready for Root.tsx`);
+    
+    // Update Root.tsx only with validated component
     await this.updateRootTsxSafely(componentName, {
       name: componentName,
       path: `./components/${componentName}`,
@@ -77,6 +92,40 @@ export class RootTsxManager {
       width: options.width || 1920,
       height: options.height || 1080
     });
+  }
+
+  /**
+   * Validate component code before saving to file (prevents undefined at source)
+   */
+  private validateComponentCode(code: string, componentName: string): boolean {
+    // Must contain export default
+    if (!code.includes('export default')) {
+      console.warn(`⚠️ Component ${componentName} missing 'export default' - will cause undefined error`);
+      return false;
+    }
+
+    // Must contain React or Remotion imports
+    const hasReactImport = code.includes("from 'react'") || code.includes('from "react"');
+    const hasRemotionImport = code.includes("from 'remotion'") || code.includes('from "remotion"');
+    
+    if (!hasReactImport && !hasRemotionImport) {
+      console.warn(`⚠️ Component ${componentName} missing React/Remotion imports`);
+      return false;
+    }
+
+    // Must contain function definition
+    if (!code.includes('function ') && !code.includes(': React.FC') && !code.includes('= ()') && !code.includes('=> {')) {
+      console.warn(`⚠️ Component ${componentName} missing valid React component definition`);
+      return false;
+    }
+
+    // Must actually contain the component name in the code
+    if (!code.includes(componentName)) {
+      console.warn(`⚠️ Component ${componentName} name not found in code - possible mismatch`);
+      return false;
+    }
+
+    return true;
   }
 
   /**
@@ -102,7 +151,50 @@ export class RootTsxManager {
   }
 
   /**
-   * Scan filesystem for actual components (corruption-proof approach)
+   * Validate that a component file exists and exports a valid React component
+   */
+  private async validateComponent(componentFilePath: string): Promise<boolean> {
+    try {
+      // Check file exists and is readable
+      const stats = await fs.stat(componentFilePath);
+      if (!stats.isFile() || stats.size === 0) {
+        return false;
+      }
+
+      // Read and validate component code
+      const code = await fs.readFile(componentFilePath, 'utf8');
+      
+      // Must contain 'export default' - this prevents undefined component errors
+      if (!code.includes('export default')) {
+        console.warn(`⚠️ Component missing export default: ${componentFilePath}`);
+        return false;
+      }
+
+      // Should contain React/Remotion imports (basic sanity check)
+      const hasReactImport = code.includes("from 'react'") || code.includes('from "react"');
+      const hasRemotionImport = code.includes("from 'remotion'") || code.includes('from "remotion"');
+      
+      if (!hasReactImport && !hasRemotionImport) {
+        console.warn(`⚠️ Component missing React/Remotion imports: ${componentFilePath}`);
+        return false;
+      }
+
+      // Basic syntax validation - must contain component definition
+      if (!code.includes('function ') && !code.includes(': React.FC') && !code.includes('= ()')) {
+        console.warn(`⚠️ Component missing valid function definition: ${componentFilePath}`);
+        return false;
+      }
+
+      return true;
+      
+    } catch (error) {
+      console.warn(`⚠️ Component validation failed: ${componentFilePath} - ${(error as Error).message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Scan filesystem for actual components with validation (prevents undefined errors)
    */
   private async scanExistingComponents(): Promise<ComponentEntry[]> {
     const components: ComponentEntry[] = [];
@@ -114,25 +206,26 @@ export class RootTsxManager {
       for (const file of files) {
         if (file.endsWith('.tsx') && file !== 'index.tsx') {
           const componentName = file.replace('.tsx', '');
-          const componentPath = path.join(this.componentsDir, file);
+          const componentFilePath = path.join(this.componentsDir, file);
           
-          // Verify file is readable and not corrupted
-          try {
-            const stats = await fs.stat(componentPath);
-            if (stats.isFile() && stats.size > 0) {
-              // Read component file to extract metadata (basic approach)
-              const content = await fs.readFile(componentPath, 'utf8');
-              
-              components.push({
-                name: componentName,
-                path: `./components/${componentName}`,
-                duration: this.extractDurationFromCode(content) || 90,
-                width: 1920, // Default, could be enhanced to read from component
-                height: 1080 // Default, could be enhanced to read from component
-              });
-            }
-          } catch (error) {
-            console.warn(`⚠️ Skipping corrupted component file: ${componentName} (${(error as Error).message})`);
+          // 🔥 NEW: Validate component before adding to Root.tsx
+          const isValid = await this.validateComponent(componentFilePath);
+          
+          if (isValid) {
+            // Read component file to extract metadata
+            const content = await fs.readFile(componentFilePath, 'utf8');
+            
+            components.push({
+              name: componentName,
+              path: `./components/${componentName}`,
+              duration: this.extractDurationFromCode(content) || 90,
+              width: 1920,
+              height: 1080
+            });
+            
+            console.log(`✅ Valid component found: ${componentName}`);
+          } else {
+            console.warn(`❌ Invalid component excluded: ${componentName} (prevents undefined errors)`);
           }
         }
       }
@@ -140,7 +233,7 @@ export class RootTsxManager {
       console.warn('⚠️ Components directory not found, starting fresh');
     }
     
-    console.log(`📊 Found ${components.length} valid components in filesystem`);
+    console.log(`📊 Found ${components.length} valid, exportable components`);
     return components;
   }
 
