@@ -14,7 +14,7 @@ class MCPAutoSetup {
   constructor() {
     this.packageName = '@endlessblink/rough-cuts-mcp';
     this.serverName = 'rough-cuts-mcp';
-    this.version = '4.5.3';
+    this.version = '4.5.4';
   }
 
   // Cross-platform Claude Desktop config detection

@@ -49,12 +49,25 @@ export class RemotionStudioManager {
         };
       }
       
-      // On Windows, quote the executable path to handle spaces
-      const executablePath = process.platform === 'win32' && npxLocation.fullPath.includes(' ') 
-        ? `"${npxLocation.fullPath}"` 
-        : npxLocation.fullPath;
+      // Windows spaces-in-path fix: For .cmd/.bat files with spaces, quotes must be part of command string
+      // Based on research: https://nodejs.org/api/child_process.html#spawning-bat-and-cmd-files-on-windows
+      const isWindowsWithSpaces = process.platform === 'win32' && npxLocation.fullPath.includes(' ');
+      const isWindowsCmdFile = process.platform === 'win32' && (npxLocation.fullPath.endsWith('.cmd') || npxLocation.fullPath.endsWith('.bat'));
+      
+      let command: string;
+      let args: string[];
+      
+      if (isWindowsWithSpaces && isWindowsCmdFile) {
+        // Method 1: Use quoted command string with shell: true (recommended approach)
+        command = `"${npxLocation.fullPath}"`;
+        args = ['remotion', 'studio', `--port=${port}`];
+      } else {
+        // Standard approach for .exe files or paths without spaces
+        command = npxLocation.fullPath;
+        args = ['remotion', 'studio', `--port=${port}`];
+      }
 
-      const studio = spawn(executablePath, ['remotion', 'studio', `--port=${port}`], {
+      const studio = spawn(command, args, {
         cwd: projectPath,
         env: createInheritedEnvironment({
           // Additional studio-specific environment
@@ -62,9 +75,18 @@ export class RemotionStudioManager {
           NODE_ENV: 'development'
         }),
         stdio: ['ignore', 'pipe', 'pipe'],  // Capture stdout/stderr
-        shell: process.platform === 'win32',  // Use shell on Windows for better compatibility
+        shell: process.platform === 'win32',  // CRITICAL: Required for .cmd/.bat files on Windows
         detached: false  // Keep attached for proper cleanup
       });
+      
+      // Debug logging for Windows path issues
+      if (process.platform === 'win32') {
+        console.error(`[STUDIO-DEBUG] Command: ${command}`);
+        console.error(`[STUDIO-DEBUG] Args: ${JSON.stringify(args)}`);
+        console.error(`[STUDIO-DEBUG] Shell: true`);
+        console.error(`[STUDIO-DEBUG] IsWindowsWithSpaces: ${isWindowsWithSpaces}`);
+        console.error(`[STUDIO-DEBUG] IsWindowsCmdFile: ${isWindowsCmdFile}`);
+      }
       
       // Store process for cleanup
       this.activeProcesses.set(studio.pid!, studio);
@@ -261,6 +283,20 @@ export class RemotionStudioManager {
           'Restart Claude Desktop after installing Node.js',
           'Ensure npx is accessible from command line',
           'Try restarting your computer if recently installed Node.js'
+        ]
+      };
+    }
+    
+    // Specific handling for Windows spaces-in-path issues
+    if (error.message?.includes('not recognized') || error.message?.includes('Program')) {
+      return {
+        success: false,
+        error: 'Windows path parsing error - likely spaces in Node.js installation path',
+        troubleshooting: [
+          'This error occurs when Node.js is installed in "C:\\Program Files\\nodejs\\"',
+          'The Windows spawn() call is not properly handling spaces in the path',
+          'Check the [STUDIO-DEBUG] output above for command details',
+          'This should be fixed in the latest MCP server version - please report if still occurs'
         ]
       };
     }
