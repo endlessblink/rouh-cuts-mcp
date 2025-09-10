@@ -33,7 +33,7 @@ class RoughCutsMCPServer {
     this.server = new Server(
       {
         name: 'rough-cuts-mcp',
-        version: '4.5.2',
+        version: '4.5.3',
       },
       {
         capabilities: {

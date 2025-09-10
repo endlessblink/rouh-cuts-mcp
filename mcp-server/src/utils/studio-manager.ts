@@ -49,7 +49,12 @@ export class RemotionStudioManager {
         };
       }
       
-      const studio = spawn(npxLocation.fullPath, ['remotion', 'studio', `--port=${port}`], {
+      // On Windows, quote the executable path to handle spaces
+      const executablePath = process.platform === 'win32' && npxLocation.fullPath.includes(' ') 
+        ? `"${npxLocation.fullPath}"` 
+        : npxLocation.fullPath;
+
+      const studio = spawn(executablePath, ['remotion', 'studio', `--port=${port}`], {
         cwd: projectPath,
         env: createInheritedEnvironment({
           // Additional studio-specific environment

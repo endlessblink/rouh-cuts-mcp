@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * 🎬 Rough Cuts MCP - Remote Installation Script
+ * Rough Cuts MCP - Remote Installation Script
  * Automated setup for fresh machines
  */
 
@@ -26,37 +26,37 @@ async function checkNodeJS() {
   try {
     const nodeVersion = execSync('node --version', { encoding: 'utf8' }).trim();
     const npmVersion = execSync('npm --version', { encoding: 'utf8' }).trim();
-    log('green', `✅ Node.js ${nodeVersion} found`);
-    log('green', `✅ npm ${npmVersion} found`);
+    log('green', `[OK] Node.js ${nodeVersion} found`);
+    log('green', `[OK] npm ${npmVersion} found`);
     return true;
   } catch (error) {
-    log('red', '❌ Node.js not found. Please install Node.js from https://nodejs.org');
+    log('red', '[ERROR] Node.js not found. Please install Node.js from https://nodejs.org');
     return false;
   }
 }
 
 async function setupMCPServer() {
-  log('blue', '🔧 Setting up MCP Server...');
+  log('blue', '[SETUP] Setting up MCP Server...');
   
   const mcpDir = path.join(process.cwd(), 'mcp-server');
   
   if (!fs.existsSync(mcpDir)) {
-    log('red', '❌ MCP server directory not found. Run this script from the rough-cuts-mcp root.');
+    log('red', '[ERROR] MCP server directory not found. Run this script from the rough-cuts-mcp root.');
     return false;
   }
   
   try {
     process.chdir(mcpDir);
-    log('blue', '📦 Installing dependencies...');
+    log('blue', '[INSTALL] Installing dependencies...');
     execSync('npm install', { stdio: 'inherit' });
     
-    log('blue', '🔨 Building TypeScript...');
+    log('blue', '[BUILD] Building TypeScript...');
     execSync('npm run build', { stdio: 'inherit' });
     
-    log('green', '✅ MCP Server built successfully!');
+    log('green', '[OK] MCP Server built successfully!');
     return true;
   } catch (error) {
-    log('red', `❌ Setup failed: ${error.message}`);
+    log('red', `[ERROR] Setup failed: ${error.message}`);
     return false;
   }
 }
