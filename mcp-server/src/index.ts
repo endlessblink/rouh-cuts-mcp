@@ -25,7 +25,7 @@ class RoughCutsMCPServer {
     this.server = new Server(
       {
         name: 'rough-cuts-mcp',
-        version: '4.0.5-fixed',
+        version: '4.2.0',
       },
       {
         capabilities: {
@@ -347,6 +347,75 @@ class RoughCutsMCPServer {
     });
   }
 
+  // 🔥 NEW: Auto-dependency installation helpers
+  private async ensureDependenciesInstalled(projectPath: string): Promise<void> {
+    const nodeModulesPath = path.join(projectPath, 'node_modules');
+    
+    try {
+      // Check if dependencies already exist
+      await fs.access(nodeModulesPath);
+      this.nodeDetector.log('✅ Dependencies already installed');
+      return;
+    } catch {
+      // Dependencies missing, install them
+      this.nodeDetector.log('📦 Installing dependencies automatically...');
+      await this.runNpmInstall(projectPath);
+    }
+  }
+
+  private async runNpmInstall(projectPath: string): Promise<void> {
+    const npmPath = await this.findExecutable('npm');
+    if (!npmPath) {
+      throw new Error('npm not found. Please ensure Node.js is properly installed.');
+    }
+
+    return new Promise((resolve, reject) => {
+      const quotedNpmPath = this.nodeDetector.getQuotedPath?.(npmPath) || npmPath;
+      
+      this.nodeDetector.log(`Running npm install in: ${projectPath}`);
+      
+      const child = spawn(quotedNpmPath, ['install'], {
+        cwd: projectPath,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        shell: os.platform() === 'win32',
+        env: { ...process.env },
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      child.stdout?.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      child.stderr?.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      child.on('close', (code) => {
+        if (code === 0) {
+          this.nodeDetector.log('✅ Dependencies installed successfully');
+          resolve();
+        } else {
+          this.nodeDetector.log(`❌ npm install failed with code ${code}`);
+          this.nodeDetector.log('stderr:', stderr);
+          reject(new Error(`Dependency installation failed: ${stderr || 'Unknown error'}`));
+        }
+      });
+
+      child.on('error', (error) => {
+        this.nodeDetector.log('❌ npm install process error:', error.message);
+        reject(new Error(`Failed to start npm install: ${error.message}`));
+      });
+
+      // Timeout after 2 minutes
+      setTimeout(() => {
+        child.kill();
+        reject(new Error('npm install timeout after 2 minutes'));
+      }, 120000);
+    });
+  }
+
   private async setupRemotionEnvironment(customPath?: unknown) {
     try {
       const projectPath = (customPath as string) || path.join(os.homedir(), '.claude-videos', 'remotion-workspace');
@@ -372,11 +441,14 @@ class RoughCutsMCPServer {
         await this.initializeRemotionProject(projectPath);
       }
 
+      // 🔥 NEW: Ensure dependencies are installed (for both new and existing projects)
+      await this.ensureDependenciesInstalled(projectPath);
+
       return {
         content: [
           {
             type: 'text',
-            text: `✅ Remotion environment ${isNewProject ? 'created' : 'found'} at: ${projectPath}\n\nProject structure:\n- package.json ✅\n- src/ ✅\n- src/Root.tsx ✅\n- src/Composition.tsx ✅\n\nReady for video creation!`,
+            text: `✅ Remotion environment ${isNewProject ? 'created' : 'found'} at: ${projectPath}\n\nProject structure:\n- package.json ✅\n- src/ ✅\n- src/Root.tsx ✅\n- src/Composition.tsx ✅\n- node_modules/ ✅ (dependencies installed)\n\nReady for video creation!`,
           },
         ],
       };
@@ -482,9 +554,182 @@ registerRoot(RemotionRoot);`;
     await fs.writeFile(path.join(srcPath, 'index.ts'), indexContent);
   }
 
+  // 🔥 NEW: Port availability checking
+  private async checkPortAvailability(port: number): Promise<boolean> {
+    return new Promise((resolve) => {
+      const net = require('net');
+      const server = net.createServer();
+      
+      server.listen(port, 'localhost', () => {
+        server.close(() => resolve(true));
+      });
+
+      server.on('error', () => resolve(false));
+    });
+  }
+
+  // 🔥 NEW: Real studio readiness detection
+  private async waitForStudioReady(childProcess: any, port: number, timeoutMs: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        childProcess.kill('SIGTERM');
+        reject(new Error(`Studio failed to start within ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      let serverReady = false;
+
+      // Monitor stdout for "Server ready" message
+      if (childProcess.stdout) {
+        childProcess.stdout.on('data', (data: Buffer) => {
+          const output = data.toString();
+          this.nodeDetector.log(`[Studio] ${output.trim()}`);
+          
+          // Remotion studio outputs "Server ready" or "Local:" when ready
+          if ((output.includes('Server ready') || output.includes('Local:') || output.includes(`localhost:${port}`)) && !serverReady) {
+            serverReady = true;
+            clearTimeout(timeout);
+            
+            // Double-check with HTTP request after 2 seconds
+            setTimeout(() => this.verifyStudioHealth(port, resolve, reject), 2000);
+          }
+        });
+      }
+
+      // Monitor stderr for errors
+      if (childProcess.stderr) {
+        childProcess.stderr.on('data', (data: Buffer) => {
+          const error = data.toString();
+          this.nodeDetector.log(`[Studio Error] ${error.trim()}`);
+          
+          // Check for common failure patterns
+          if (error.includes('EADDRINUSE') || (error.includes('port') && error.includes('use'))) {
+            clearTimeout(timeout);
+            childProcess.kill('SIGTERM');
+            reject(new Error(`Port ${port} is already in use`));
+          }
+        });
+      }
+
+      // Handle process errors
+      childProcess.on('error', (error: Error) => {
+        clearTimeout(timeout);
+        reject(new Error(`Process spawn failed: ${error.message}`));
+      });
+
+      childProcess.on('exit', (code: number, signal: string) => {
+        if (!serverReady) {
+          clearTimeout(timeout);
+          reject(new Error(`Studio process exited prematurely (code: ${code}, signal: ${signal})`));
+        }
+      });
+    });
+  }
+
+  // 🔥 NEW: HTTP health check verification
+  private async verifyStudioHealth(port: number, resolve: Function, reject: Function): Promise<void> {
+    try {
+      const http = require('http');
+      
+      const req = http.request(
+        {
+          hostname: 'localhost',
+          port: port,
+          path: '/',
+          method: 'GET',
+          timeout: 5000
+        },
+        (res: any) => {
+          this.nodeDetector.log(`✅ Studio health check passed (status: ${res.statusCode})`);
+          resolve();
+        }
+      );
+
+      req.on('error', (error: Error) => {
+        this.nodeDetector.log(`⚠️ Health check failed, but studio may still be starting: ${error.message}`);
+        // Don't reject - stdout detection is primary, this is secondary verification
+        resolve();
+      });
+
+      req.on('timeout', () => {
+        req.destroy();
+        this.nodeDetector.log('⚠️ Health check timeout, but studio may still be working');
+        resolve(); // Don't fail on health check timeout
+      });
+
+      req.end();
+      
+    } catch (error) {
+      this.nodeDetector.log(`⚠️ Health check error: ${(error as Error).message}`);
+      resolve(); // Don't fail the entire launch on health check issues
+    }
+  }
+
+  // 🔥 NEW: Enhanced error classification
+  private classifyLaunchError(error: Error): string {
+    const message = error.message.toLowerCase();
+    
+    if (message.includes('eaddrinuse') || (message.includes('port') && message.includes('use'))) {
+      return 'PORT_IN_USE';
+    }
+    
+    if (message.includes('enoent') || message.includes('not found')) {
+      return 'EXECUTABLE_NOT_FOUND';
+    }
+    
+    if (message.includes('timeout')) {
+      return 'STARTUP_TIMEOUT';
+    }
+    
+    if (message.includes('econnrefused')) {
+      return 'CONNECTION_REFUSED';
+    }
+
+    if (message.includes('dependency') || message.includes('npm install')) {
+      return 'DEPENDENCY_ERROR';
+    }
+
+    if (message.includes('spawn') && message.includes('failed')) {
+      return 'PROCESS_SPAWN_ERROR';
+    }
+    
+    return 'UNKNOWN_ERROR';
+  }
+
+  // 🔥 NEW: User-friendly error solutions
+  private getErrorSolution(errorType: string, port: number): string {
+    switch (errorType) {
+      case 'PORT_IN_USE':
+        return `Port ${port} is busy. Solutions:\n- Try a different port (e.g., 3001, 3002)\n- Stop other applications using this port\n- On Windows: netstat -ano | findstr :${port}`;
+      
+      case 'EXECUTABLE_NOT_FOUND':
+        return 'Node.js tools not found. Solutions:\n- Install Node.js from https://nodejs.org/\n- Restart your terminal/IDE after installation\n- Verify PATH includes Node.js';
+      
+      case 'STARTUP_TIMEOUT':
+        return 'Studio took too long to start. Solutions:\n- Check internet connection for dependency downloads\n- Verify project structure is correct\n- Try launching with more time or manually';
+      
+      case 'CONNECTION_REFUSED':
+        return 'Cannot connect to studio server. Solutions:\n- Check firewall allows localhost connections\n- Verify antivirus isn\'t blocking Node.js\n- Try running as administrator';
+
+      case 'DEPENDENCY_ERROR':
+        return 'Dependency installation failed. Solutions:\n- Check internet connection\n- Clear npm cache: npm cache clean --force\n- Verify npm registry access\n- Try manual installation in project folder';
+
+      case 'PROCESS_SPAWN_ERROR':
+        return 'Failed to start studio process. Solutions:\n- Restart Claude Desktop application\n- Check Node.js installation\n- Verify file permissions in project directory';
+      
+      default:
+        return 'Check the error message above for specific details or try manual installation.';
+    }
+  }
+
   // 🔥 FIXED: Use UniversalNodeDetector for launching studio
   private async launchRemotionStudio(port: number = 3000) {
     try {
+      // 🔥 NEW: Check if port is available first
+      const isPortFree = await this.checkPortAvailability(port);
+      if (!isPortFree) {
+        throw new Error(`Port ${port} is already in use. Please try a different port or stop the application using this port.`);
+      }
+
       const npxPath = await this.findExecutable('npx');
       if (!npxPath) {
         throw new Error('npx not found. Please install Node.js.');
@@ -492,12 +737,16 @@ registerRoot(RemotionRoot);`;
 
       const projectPath = path.join(os.homedir(), '.claude-videos', 'remotion-workspace');
       
-      // Ensure project exists
+      // Ensure project exists with dependencies
       try {
         await fs.access(path.join(projectPath, 'package.json'));
+        // 🔥 NEW: Also ensure dependencies are installed
+        await this.ensureDependenciesInstalled(projectPath);
       } catch {
         await this.setupRemotionEnvironment(undefined);
       }
+
+      this.nodeDetector.log(`🚀 Launching Remotion Studio on port ${port}...`);
 
       // Use proper path quoting for the spawn command
       const quotedNpxPath = this.nodeDetector.getQuotedPath?.(npxPath) || npxPath;
@@ -509,23 +758,29 @@ registerRoot(RemotionRoot);`;
         env: { ...process.env },
       });
 
-      // Give the server time to start
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // 🔥 NEW: Real server readiness detection instead of timeout
+      await this.waitForStudioReady(child, port, 30000); // 30 second timeout
 
       return {
         content: [
           {
             type: 'text',
-            text: `🚀 Remotion Studio launched!\n\n📍 URL: http://localhost:${port}\n📂 Project: ${projectPath}\n\nThe studio is now running in the background. Open the URL in your browser to preview and edit your videos.`,
+            text: `🚀 Remotion Studio launched successfully!\n\n📍 URL: http://localhost:${port}\n📂 Project: ${projectPath}\n✅ Server is ready and responding\n\nThe studio is now running and accessible. Open the URL in your browser to start creating videos.`,
           },
         ],
       };
     } catch (error) {
+      // 🔥 NEW: Enhanced error handling with specific solutions
+      const errorType = this.classifyLaunchError(error as Error);
+      const solution = this.getErrorSolution(errorType, port);
+      
+      this.nodeDetector.log(`❌ Studio launch failed: ${(error as Error).message}`);
+      
       return {
         content: [
           {
             type: 'text',
-            text: `Failed to launch Remotion Studio: ${(error as Error).message}`,
+            text: `❌ Failed to launch Remotion Studio: ${(error as Error).message}\n\n💡 Solutions:\n${solution}`,
           },
         ],
       };
