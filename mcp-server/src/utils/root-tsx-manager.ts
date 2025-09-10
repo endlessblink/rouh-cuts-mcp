@@ -251,7 +251,7 @@ export class RootTsxManager {
       return true;
     });
     
-    console.log(`🧹 Deduplicated: ${components.length} → ${deduplicated.length} components`);
+    console.log(`[CLEANUP] Deduplicated: ${components.length} -> ${deduplicated.length} components`);
     return deduplicated;
   }
 

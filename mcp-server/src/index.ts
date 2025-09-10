@@ -13,17 +13,21 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
 
-// 🔥 CRITICAL FIX: Import and use the existing UniversalNodeDetector
+// CRITICAL FIX: Import and use the existing UniversalNodeDetector
 import { UniversalNodeDetector } from './universal-node-detector.js';
-// 🔥 NEW: Import Root.tsx corruption prevention system
+// NEW: Import Root.tsx corruption prevention system
 import { RootTsxManager } from './utils/root-tsx-manager.js';
+// NEW: Import RemotionEnvironmentFixer for Node.js v22 compatibility
+import { RemotionEnvironmentFixer } from './remotion-environment-fixer.js';
 
 class RoughCutsMCPServer {
   private server: Server;
-  // 🔥 FIXED: Initialize the UniversalNodeDetector that already exists
+  // FIXED: Initialize the UniversalNodeDetector that already exists
   private nodeDetector: UniversalNodeDetector;
-  // 🔥 NEW: Root.tsx corruption prevention manager
+  // NEW: Root.tsx corruption prevention manager
   private rootTsxManager: RootTsxManager;
+  // NEW: Environment fixer for Node.js v22 compatibility
+  private environmentFixer: RemotionEnvironmentFixer;
 
   constructor() {
     this.server = new Server(
@@ -38,17 +42,20 @@ class RoughCutsMCPServer {
       }
     );
 
-    // 🚀 INTEGRATION FIX: Use the UniversalNodeDetector with debug enabled
+    // INTEGRATION FIX: Use the UniversalNodeDetector with debug enabled
     this.nodeDetector = new UniversalNodeDetector({ debug: true });
     
-    // 🔥 NEW: Initialize Root.tsx manager with default workspace path
+    // NEW: Initialize Root.tsx manager with default workspace path
     const workspacePath = path.join(os.homedir(), '.claude-videos', 'remotion-workspace');
     this.rootTsxManager = new RootTsxManager(workspacePath);
+    
+    // NEW: Initialize environment fixer with workspace path
+    this.environmentFixer = new RemotionEnvironmentFixer(workspacePath, { debug: true });
     
     this.setupToolHandlers();
   }
 
-  // 🔥 FIXED: Replace problematic execSync with UniversalNodeDetector
+  // FIXED: Replace problematic execSync with UniversalNodeDetector
   async findExecutable(name: string): Promise<string | null> {
     try {
       switch (name.toLowerCase()) {
@@ -199,6 +206,40 @@ class RoughCutsMCPServer {
             properties: {},
           },
         },
+        {
+          name: 'diagnose_remotion_error',
+          description: 'Automatically detect Node.js v22 compatibility issues and "require is not defined" errors',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+          },
+        },
+        {
+          name: 'auto_fix_remotion_environment',
+          description: 'One-click automatic fix for Node.js v22 compatibility issues and module system conflicts',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+          },
+        },
+        {
+          name: 'render_video_non_interactive',
+          description: 'Render Remotion video automatically without interactive composition selection',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              compositionId: {
+                type: 'string',
+                description: 'Composition ID to render (e.g., "GitHubProfileShowcase", "Main")',
+                default: 'Main'
+              },
+              outputPath: {
+                type: 'string',
+                description: 'Output file path (optional, defaults to out/[composition].mp4)'
+              }
+            }
+          },
+        },
       ],
     }));
 
@@ -231,6 +272,15 @@ class RoughCutsMCPServer {
             return await this.autoRepairRoot();
           case 'validate_root_tsx':
             return await this.validateRootTsx();
+          case 'diagnose_remotion_error':
+            return await this.diagnoseRemotionError();
+          case 'auto_fix_remotion_environment':
+            return await this.autoFixRemotionEnvironment();
+          case 'render_video_non_interactive':
+            return await this.renderVideoNonInteractive(
+              (args as any)?.compositionId || 'Main',
+              (args as any)?.outputPath
+            );
           default:
             throw new McpError(
               ErrorCode.MethodNotFound,
@@ -246,7 +296,7 @@ class RoughCutsMCPServer {
     });
   }
 
-  // 🔥 FIXED: Use UniversalNodeDetector for comprehensive environment checking
+  // FIXED: Use UniversalNodeDetector for comprehensive environment checking
   private async checkEnvironment() {
     try {
       const results = {
@@ -258,7 +308,7 @@ class RoughCutsMCPServer {
         status: 'CHECKING',
       };
 
-      // 🚀 FIXED: Use the integrated detector instead of broken execSync
+      // FIXED: Use the integrated detector instead of broken execSync
       const executables = {
         node: await this.findExecutable('node'),
         npm: await this.findExecutable('npm'),
@@ -319,7 +369,7 @@ class RoughCutsMCPServer {
         content: [
           {
             type: 'text',
-            text: `Environment Status Report:\n\nPlatform: ${results.platform}\nNode.js: ${results.nodeVersion}\n\n✅ Node.js: ${results.nodeVersion} at "${executables.node}"\n✅ npm: ${results.npmVersion} at "${executables.npm}"\n✅ npx: ${results.npxVersion} at "${executables.npx}"\n\nStatus: ${results.status}`,
+            text: `Environment Status Report:\n\nPlatform: ${results.platform}\nNode.js: ${results.nodeVersion}\n\n[OK] Node.js: ${results.nodeVersion} at "${executables.node}"\n[OK] npm: ${results.npmVersion} at "${executables.npm}"\n[OK] npx: ${results.npxVersion} at "${executables.npx}"\n\nStatus: ${results.status}`,
           },
         ],
       };
@@ -333,7 +383,7 @@ class RoughCutsMCPServer {
         ],
       };
     }
-  }  // 🔥 FIXED: Use proper command execution with path quoting
+  }  // FIXED: Use proper command execution with path quoting
   private async getVersion(execPath: string, flag: string): Promise<string> {
     return new Promise((resolve, reject) => {
       // Use the UniversalNodeDetector's path quoting
@@ -375,18 +425,18 @@ class RoughCutsMCPServer {
     });
   }
 
-  // 🔥 NEW: Auto-dependency installation helpers
+  // NEW: Auto-dependency installation helpers
   private async ensureDependenciesInstalled(projectPath: string): Promise<void> {
     const nodeModulesPath = path.join(projectPath, 'node_modules');
     
     try {
       // Check if dependencies already exist
       await fs.access(nodeModulesPath);
-      this.nodeDetector.log('✅ Dependencies already installed');
+      this.nodeDetector.log('[OK] Dependencies already installed');
       return;
     } catch {
       // Dependencies missing, install them
-      this.nodeDetector.log('📦 Installing dependencies automatically...');
+      this.nodeDetector.log('[INSTALL] Installing dependencies automatically...');
       await this.runNpmInstall(projectPath);
     }
   }
@@ -422,17 +472,17 @@ class RoughCutsMCPServer {
 
       child.on('close', (code) => {
         if (code === 0) {
-          this.nodeDetector.log('✅ Dependencies installed successfully');
+          this.nodeDetector.log('[OK] Dependencies installed successfully');
           resolve();
         } else {
-          this.nodeDetector.log(`❌ npm install failed with code ${code}`);
+          this.nodeDetector.log(`[ERROR] npm install failed with code ${code}`);
           this.nodeDetector.log('stderr:', stderr);
           reject(new Error(`Dependency installation failed: ${stderr || 'Unknown error'}`));
         }
       });
 
       child.on('error', (error) => {
-        this.nodeDetector.log('❌ npm install process error:', error.message);
+        this.nodeDetector.log('[ERROR] npm install process error:', error.message);
         reject(new Error(`Failed to start npm install: ${error.message}`));
       });
 
@@ -469,14 +519,14 @@ class RoughCutsMCPServer {
         await this.initializeRemotionProject(projectPath);
       }
 
-      // 🔥 NEW: Ensure dependencies are installed (for both new and existing projects)
+      // NEW: Ensure dependencies are installed (for both new and existing projects)
       await this.ensureDependenciesInstalled(projectPath);
 
       return {
         content: [
           {
             type: 'text',
-            text: `✅ Remotion environment ${isNewProject ? 'created' : 'found'} at: ${projectPath}\n\nProject structure:\n- package.json ✅\n- src/ ✅\n- src/Root.tsx ✅\n- src/Composition.tsx ✅\n- node_modules/ ✅ (dependencies installed)\n\nReady for video creation!`,
+            text: `[OK] Remotion environment ${isNewProject ? 'created' : 'found'} at: ${projectPath}\n\nProject structure:\n- package.json [OK]\n- src/ [OK]\n- src/Root.tsx [OK]\n- src/Composition.tsx [OK]\n- node_modules/ [OK] (dependencies installed)\n\nReady for video creation!`,
           },
         ],
       };
@@ -582,7 +632,7 @@ registerRoot(RemotionRoot);`;
     await fs.writeFile(path.join(srcPath, 'index.ts'), indexContent);
   }
 
-  // 🔥 NEW: Port availability checking
+  // NEW: Port availability checking
   private async checkPortAvailability(port: number): Promise<boolean> {
     return new Promise((resolve) => {
       const net = require('net');
@@ -596,7 +646,7 @@ registerRoot(RemotionRoot);`;
     });
   }
 
-  // 🔥 NEW: Real studio readiness detection
+  // NEW: Real studio readiness detection
   private async waitForStudioReady(childProcess: any, port: number, timeoutMs: number): Promise<void> {
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
@@ -653,7 +703,7 @@ registerRoot(RemotionRoot);`;
     });
   }
 
-  // 🔥 NEW: HTTP health check verification
+  // NEW: HTTP health check verification
   private async verifyStudioHealth(port: number, resolve: Function, reject: Function): Promise<void> {
     try {
       const http = require('http');
@@ -667,32 +717,32 @@ registerRoot(RemotionRoot);`;
           timeout: 5000
         },
         (res: any) => {
-          this.nodeDetector.log(`✅ Studio health check passed (status: ${res.statusCode})`);
+          this.nodeDetector.log(`[OK] Studio health check passed (status: ${res.statusCode})`);
           resolve();
         }
       );
 
       req.on('error', (error: Error) => {
-        this.nodeDetector.log(`⚠️ Health check failed, but studio may still be starting: ${error.message}`);
+        this.nodeDetector.log(`[WARNING] Health check failed, but studio may still be starting: ${error.message}`);
         // Don't reject - stdout detection is primary, this is secondary verification
         resolve();
       });
 
       req.on('timeout', () => {
         req.destroy();
-        this.nodeDetector.log('⚠️ Health check timeout, but studio may still be working');
+        this.nodeDetector.log('[WARNING] Health check timeout, but studio may still be working');
         resolve(); // Don't fail on health check timeout
       });
 
       req.end();
       
     } catch (error) {
-      this.nodeDetector.log(`⚠️ Health check error: ${(error as Error).message}`);
+      this.nodeDetector.log(`[WARNING] Health check error: ${(error as Error).message}`);
       resolve(); // Don't fail the entire launch on health check issues
     }
   }
 
-  // 🔥 NEW: Enhanced error classification
+  // NEW: Enhanced error classification
   private classifyLaunchError(error: Error): string {
     const message = error.message.toLowerCase();
     
@@ -723,7 +773,7 @@ registerRoot(RemotionRoot);`;
     return 'UNKNOWN_ERROR';
   }
 
-  // 🔥 NEW: User-friendly error solutions
+  // NEW: User-friendly error solutions
   private getErrorSolution(errorType: string, port: number): string {
     switch (errorType) {
       case 'PORT_IN_USE':
@@ -749,73 +799,56 @@ registerRoot(RemotionRoot);`;
     }
   }
 
-  // 🔥 FIXED: Use UniversalNodeDetector for launching studio
+  // ENHANCED: Use RemotionEnvironmentFixer for safe studio launching
   private async launchRemotionStudio(port: number = 3000) {
     try {
-      // 🔥 NEW: Check if port is available first
-      const isPortFree = await this.checkPortAvailability(port);
-      if (!isPortFree) {
-        throw new Error(`Port ${port} is already in use. Please try a different port or stop the application using this port.`);
-      }
-
-      const npxPath = await this.findExecutable('npx');
-      if (!npxPath) {
-        throw new Error('npx not found. Please install Node.js.');
-      }
-
-      const projectPath = path.join(os.homedir(), '.claude-videos', 'remotion-workspace');
+      // First, try using the safe launcher with pre-flight checks
+      const result = await this.environmentFixer.launchStudioSafe(port);
       
-      // Ensure project exists with dependencies
-      try {
-        await fs.access(path.join(projectPath, 'package.json'));
-        // 🔥 NEW: Also ensure dependencies are installed
-        await this.ensureDependenciesInstalled(projectPath);
-      } catch {
-        await this.setupRemotionEnvironment(undefined);
-      }
-
-      this.nodeDetector.log(`🚀 Launching Remotion Studio on port ${port}...`);
-
-      // Use proper path quoting for the spawn command
-      const quotedNpxPath = this.nodeDetector.getQuotedPath?.(npxPath) || npxPath;
-      
-      const child = spawn(quotedNpxPath, ['remotion', 'studio', '--port', port.toString()], {
-        cwd: projectPath,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        shell: os.platform() === 'win32',
-        env: { ...process.env },
-      });
-
-      // 🔥 NEW: Real server readiness detection instead of timeout
-      await this.waitForStudioReady(child, port, 30000); // 30 second timeout
-
-      return {
-        content: [
-          {
+      if (result.success) {
+        return {
+          content: [{
             type: 'text',
-            text: `🚀 Remotion Studio launched successfully!\n\n📍 URL: http://localhost:${port}\n📂 Project: ${projectPath}\n✅ Server is ready and responding\n\nThe studio is now running and accessible. Open the URL in your browser to start creating videos.`,
-          },
-        ],
-      };
+            text: `🚀 ${result.message}\n\nURL: ${result.url}\n✅ Environment compatibility verified\n✅ Server is ready and responding\n\nThe studio is now running with Node.js v22 compatibility fixes applied.`
+          }]
+        };
+      } else {
+        // Provide enhanced error message with auto-fix suggestions
+        let errorText = `❌ Studio launch failed: ${result.message}`;
+        
+        if (result.error) {
+          errorText += `\n\nError details: ${result.error}`;
+        }
+        
+        // Specific suggestions based on error type
+        if (result.error?.includes('require is not defined')) {
+          errorText += '\n\n💡 This is a Node.js v22 compatibility issue. Try:\n• diagnose_remotion_error - Check environment\n• auto_fix_remotion_environment - Apply automatic fixes';
+        } else if (result.error?.includes('Port') && result.error?.includes('use')) {
+          errorText += `\n\n💡 Port ${port} is busy. Try:\n• Use a different port (3001, 3002, etc.)\n• Stop other applications using this port`;
+        } else {
+          errorText += '\n\n💡 General troubleshooting:\n• Run diagnose_remotion_error first\n• Check Node.js installation\n• Verify project permissions';
+        }
+        
+        return {
+          content: [{
+            type: 'text',
+            text: errorText
+          }]
+        };
+      }
+      
     } catch (error) {
-      // 🔥 NEW: Enhanced error handling with specific solutions
-      const errorType = this.classifyLaunchError(error as Error);
-      const solution = this.getErrorSolution(errorType, port);
-      
-      this.nodeDetector.log(`❌ Studio launch failed: ${(error as Error).message}`);
-      
+      // Fallback error handling
       return {
-        content: [
-          {
-            type: 'text',
-            text: `❌ Failed to launch Remotion Studio: ${(error as Error).message}\n\n💡 Solutions:\n${solution}`,
-          },
-        ],
+        content: [{
+          type: 'text',
+          text: `❌ Studio launch failed: ${(error as Error).message}\n\n💡 Try running auto_fix_remotion_environment to resolve Node.js v22 compatibility issues`
+        }]
       };
     }
   }
 
-  // 🔥 FIXED: Add comprehensive code validation and cleaning
+  // FIXED: Add comprehensive code validation and cleaning
   private cleanRemotionCode(code: string, componentName: string): string {
     let cleanedCode = code;
     let repairs = [];
@@ -897,7 +930,7 @@ registerRoot(RemotionRoot);`;
       cleanedCode = validLines.join('\n');
 
       if (repairs.length > 0) {
-        this.nodeDetector.log(`🔧 Code repairs applied: ${repairs.join(', ')}`);
+        this.nodeDetector.log(`[REPAIR] Code repairs applied: ${repairs.join(', ')}`);
       }
 
       return cleanedCode.trim();
@@ -925,7 +958,7 @@ registerRoot(RemotionRoot);`;
       // Ensure components directory exists
       await fs.mkdir(componentsPath, { recursive: true });
 
-      // 🔥 FIXED: Clean the code before saving
+      // FIXED: Clean the code before saving
       const cleanedCode = this.cleanRemotionCode(codeStr, componentNameStr);
 
       // Validate the cleaned code
@@ -937,7 +970,7 @@ registerRoot(RemotionRoot);`;
         throw new Error('Component must have an export statement');
       }
 
-      // 🔥 FIXED: Use RootTsxManager for corruption-safe component creation
+      // FIXED: Use RootTsxManager for corruption-safe component creation
       try {
         await this.rootTsxManager.addComponentSafely(componentNameStr, cleanedCode, {
           duration: Math.floor(durationNum * 30), // Convert to frames
@@ -946,7 +979,7 @@ registerRoot(RemotionRoot);`;
         });
       } catch (rootError) {
         // Auto-repair on Root.tsx corruption and retry once
-        this.nodeDetector.log('🔧 Component creation failed, attempting auto-repair...');
+        this.nodeDetector.log('[REPAIR] Component creation failed, attempting auto-repair...');
         await this.rootTsxManager.repairRootTsx();
         
         // Retry component creation after repair
@@ -961,7 +994,7 @@ registerRoot(RemotionRoot);`;
         content: [
           {
             type: 'text',
-            text: `✅ Component "${componentNameStr}" created successfully!\n\nDuration: ${durationNum} seconds (${Math.floor(durationNum * 30)} frames)\nLocation: ${this.rootTsxManager.getComponentsDir()}/${componentNameStr}.tsx\nRegistered: Added to Root.tsx with corruption prevention\n\nFeatures applied:\n• Automatic syntax error repair\n• Root.tsx corruption prevention\n• Atomic file operations\n• Duplicate detection and removal\n• Import/composition deduplication\n\nNext steps:\n• Launch Remotion Studio to preview your component\n• Component will load without undefined errors`,
+            text: `[OK] Component "${componentNameStr}" created successfully!\n\nDuration: ${durationNum} seconds (${Math.floor(durationNum * 30)} frames)\nLocation: ${this.rootTsxManager.getComponentsDir()}/${componentNameStr}.tsx\nRegistered: Added to Root.tsx with corruption prevention\n\nFeatures applied:\n• Automatic syntax error repair\n• Root.tsx corruption prevention\n• Atomic file operations\n• Duplicate detection and removal\n• Import/composition deduplication\n\nNext steps:\n• Launch Remotion Studio to preview your component\n• Component will load without undefined errors`,
           },
         ],
       };
@@ -971,7 +1004,7 @@ registerRoot(RemotionRoot);`;
         content: [
           {
             type: 'text',
-            text: `❌ Failed to create component: ${(error as Error).message}\n\n💡 If this is a Root.tsx corruption issue, try:\n• auto_repair_root - Fix Root.tsx automatically\n• validate_root_tsx - Check for corruption patterns`,
+            text: `[ERROR] Failed to create component: ${(error as Error).message}\n\nIf this is a Root.tsx corruption issue, try:\n• auto_repair_root - Fix Root.tsx automatically\n• validate_root_tsx - Check for corruption patterns`,
           },
         ],
       };
@@ -1040,7 +1073,7 @@ registerRoot(RemotionRoot);`;
 
       let content = await fs.readFile(componentFile, 'utf8');
       
-      // 🔥 FIXED: Use comprehensive code cleaning
+      // FIXED: Use comprehensive code cleaning
       const cleanedContent = this.cleanRemotionCode(content, componentNameStr);
       
       // Check if content was actually cleaned
@@ -1054,7 +1087,7 @@ registerRoot(RemotionRoot);`;
           content: [
             {
               type: 'text',
-              text: `✅ Component "${componentNameStr}" repaired successfully!\n\nRepairs applied:\n• Removed invalid syntax patterns\n• Fixed export statements\n• Cleaned documentation artifacts\n• Validated TypeScript syntax\n\nThe component is now ready for use in Remotion Studio.`,
+              text: `[OK] Component "${componentNameStr}" repaired successfully!\n\nRepairs applied:\n• Removed invalid syntax patterns\n• Fixed export statements\n• Cleaned documentation artifacts\n• Validated TypeScript syntax\n\nThe component is now ready for use in Remotion Studio.`,
             },
           ],
         };
@@ -1063,7 +1096,7 @@ registerRoot(RemotionRoot);`;
           content: [
             {
               type: 'text',
-              text: `✅ Component "${componentNameStr}" is already valid - no repairs needed!`,
+              text: `[OK] Component "${componentNameStr}" is already valid - no repairs needed!`,
             },
           ],
         };
@@ -1211,7 +1244,7 @@ Always follow these patterns for professional results!`
       content: [
         {
           type: 'text',
-          text: `🎬 Animation Guidelines: ${type}\n\n${guideline}`,
+          text: `Animation Guidelines: ${type}\n\n${guideline}`,
         },
       ],
     };
@@ -1333,6 +1366,218 @@ Always follow these patterns for professional results!`
         content: [{
           type: 'text',
           text: `❌ Validation failed: ${(error as Error).message}`
+        }]
+      };
+    }
+  }
+
+  // 🔥 NEW: MCP Tool - Non-Interactive Video Rendering with Smart Composition Creation
+  private async renderVideoNonInteractive(compositionId: string, outputPath?: string): Promise<any> {
+    try {
+      const projectPath = path.join(os.homedir(), '.claude-videos', 'remotion-workspace');
+      
+      // Ensure project exists
+      if (!await fs.access(projectPath).then(() => true).catch(() => false)) {
+        return {
+          content: [{
+            type: 'text',
+            text: '❌ Remotion workspace not found. Run setup_remotion_environment first.'
+          }]
+        };
+      }
+
+      // 🎯 Note: Composition auto-creation available in future version
+
+      const npxPath = await this.findExecutable('npx');
+      if (!npxPath) {
+        return {
+          content: [{
+            type: 'text',
+            text: '❌ npx not found. Please install Node.js.'
+          }]
+        };
+      }
+
+      // Default output path if not specified
+      const output = outputPath || `out/${compositionId}.mp4`;
+      
+      this.nodeDetector.log(`[RENDER] Starting non-interactive render: ${compositionId}`);
+
+      return new Promise((resolve) => {
+        const child = spawn(npxPath, [
+          'remotion', 'render',
+          compositionId,        // Composition ID (no interactive selection)
+          output,               // Output path
+          '--overwrite'         // Overwrite existing files without prompting
+        ], {
+          cwd: projectPath,
+          stdio: ['ignore', 'pipe', 'pipe'],
+          shell: process.platform === 'win32',
+          env: {
+            ...process.env,
+            CI: 'true',                           // Force non-interactive mode
+            NODE_OPTIONS: '--max-old-space-size=4096',
+            REMOTION_NON_INTERACTIVE: '1'
+          }
+        });
+
+        let stdout = '';
+        let stderr = '';
+        let progress = '';
+
+        child.stdout?.on('data', (data) => {
+          const output = data.toString();
+          stdout += output;
+          
+          // Extract progress information
+          if (output.includes('Rendering frames') || output.includes('Encoded video')) {
+            progress = output.trim();
+            this.nodeDetector.log(`[PROGRESS] ${progress}`);
+          }
+        });
+
+        child.stderr?.on('data', (data) => {
+          stderr += data.toString();
+          this.nodeDetector.log(`[RENDER ERROR] ${data.toString().trim()}`);
+        });
+
+        child.on('close', (code) => {
+          if (code === 0) {
+            const successMatch = stdout.match(/\+ (.*?\.mp4) ([\d.]+\s*[KMGT]?B)/)
+            const outputFile = successMatch ? successMatch[1] : output;
+            const fileSize = successMatch ? successMatch[2] : 'Unknown size';
+            
+            resolve({
+              content: [{
+                type: 'text',
+                text: `✅ Video rendered successfully!\n\n📹 Output: ${outputFile}\n📊 Size: ${fileSize}\n🎯 Composition: ${compositionId}\n\nThe video has been saved to the output directory and is ready for use.`
+              }]
+            });
+          } else {
+            // Handle common render errors
+            let errorMessage = `❌ Render failed (exit code: ${code})`;
+            
+            if (stderr.includes('Composition') && stderr.includes('not found')) {
+              errorMessage += `\n\n💡 Composition "${compositionId}" not found. Available compositions:\n• Try 'Main' (default)\n• Check list_components for available compositions\n• Ensure components are properly registered in Root.tsx`;
+            } else if (stderr.includes('ENOENT')) {
+              errorMessage += '\n\n💡 File not found error. Try running setup_remotion_environment first.';
+            } else if (stderr.includes('memory')) {
+              errorMessage += '\n\n💡 Out of memory. Try reducing video resolution or duration.';
+            } else if (stderr) {
+              errorMessage += `\n\nError details: ${stderr}`;
+            }
+            
+            resolve({
+              content: [{
+                type: 'text',
+                text: errorMessage
+              }]
+            });
+          }
+        });
+
+        child.on('error', (error) => {
+          resolve({
+            content: [{
+              type: 'text',
+              text: `❌ Failed to start render process: ${error.message}`
+            }]
+          });
+        });
+
+        // Timeout after 10 minutes for long renders
+        setTimeout(() => {
+          child.kill();
+          resolve({
+            content: [{
+              type: 'text',
+              text: '❌ Render timeout after 10 minutes. Try reducing video complexity or duration.'
+            }]
+          });
+        }, 600000);
+      });
+      
+    } catch (error) {
+      return {
+        content: [{
+          type: 'text',
+          text: `❌ Render setup failed: ${(error as Error).message}`
+        }]
+      };
+    }
+  }
+
+  // 🔥 NEW: MCP Tool - Diagnose Remotion Environment Issues
+  private async diagnoseRemotionError(): Promise<any> {
+    try {
+      const diagnostic = await this.environmentFixer.diagnoseRemotionError();
+      
+      let statusText = diagnostic.success 
+        ? '✅ Environment is healthy for Node.js v22 compatibility'
+        : '🚨 Environment compatibility issues detected';
+      
+      let issuesText = diagnostic.issues.length > 0
+        ? `\n\n⚠️ Issues found:\n${diagnostic.issues.map(issue => `• ${issue}`).join('\n')}`
+        : '';
+        
+      let fixesText = diagnostic.fixes.length > 0
+        ? `\n\n💡 Recommended fixes:\n${diagnostic.fixes.map(fix => `• ${fix}`).join('\n')}`
+        : '';
+        
+      let envInfo = `\n\n📊 Environment:\n• Node.js: ${diagnostic.nodeVersion}\n• Platform: ${diagnostic.platform}`;
+      
+      let suggestion = !diagnostic.success
+        ? '\n\n🛠️ Run auto_fix_remotion_environment to apply fixes automatically'
+        : '';
+
+      return {
+        content: [{
+          type: 'text',
+          text: `${statusText}${envInfo}${issuesText}${fixesText}${suggestion}`
+        }]
+      };
+    } catch (error) {
+      return {
+        content: [{
+          type: 'text',
+          text: `❌ Diagnostics failed: ${(error as Error).message}`
+        }]
+      };
+    }
+  }
+
+  // 🔥 NEW: MCP Tool - Auto-Fix Remotion Environment
+  private async autoFixRemotionEnvironment(): Promise<any> {
+    try {
+      const result = await this.environmentFixer.autoFixRemotionEnvironment();
+      
+      let statusText = result.success
+        ? '✅ Environment automatically fixed for Node.js v22 compatibility'
+        : '❌ Auto-fix encountered issues';
+        
+      let actionsText = result.actions.length > 0
+        ? `\n\n🔧 Actions performed:\n${result.actions.map(action => `• ${action}`).join('\n')}`
+        : '';
+        
+      let errorText = result.error
+        ? `\n\n❌ Error: ${result.error}`
+        : '';
+        
+      let nextSteps = result.success
+        ? '\n\n🚀 Next steps:\n• Dependencies may need reinstalling: npm install\n• Try launching Remotion Studio again\n• "require is not defined" errors should be resolved'
+        : '\n\n🔍 Manual intervention may be required';
+
+      return {
+        content: [{
+          type: 'text',
+          text: `${statusText}${actionsText}${errorText}${nextSteps}`
+        }]
+      };
+    } catch (error) {
+      return {
+        content: [{
+          type: 'text',
+          text: `❌ Auto-fix failed: ${(error as Error).message}\n\n💡 Try running diagnose_remotion_error first to identify specific issues`
         }]
       };
     }

@@ -318,7 +318,7 @@ async function handleCheckEnvironment() {
   statusText += `Node.js: ${process.version}\n\n`;
   
   if (environmentCheck.valid) {
-    statusText += `✅ All required tools found:\n`;
+    statusText += `[OK] All required tools found:\n`;
     for (const tool of environmentCheck.found) {
       statusText += `  - ${tool.command}: ${tool.fullPath}`;
       if (tool.version) statusText += ` (${tool.version})`;
@@ -326,7 +326,7 @@ async function handleCheckEnvironment() {
     }
     statusText += `\nStatus: READY for video creation`;
   } else {
-    statusText += `❌ Missing required tools: ${environmentCheck.missing.join(', ')}\n\n`;
+    statusText += `[ERROR] Missing required tools: ${environmentCheck.missing.join(', ')}\n\n`;
     if (environmentCheck.found.length > 0) {
       statusText += `Found tools:\n`;
       for (const tool of environmentCheck.found) {
@@ -363,7 +363,7 @@ async function handleSetupEnvironment(customPath?: string) {
       content: [
         {
           type: 'text',
-          text: `✅ Remotion environment ready!\n\nProject Path: ${projectDir}\n\nYou can now create video components and launch Remotion Studio.`
+          text: `[OK] Remotion environment ready!\n\nProject Path: ${projectDir}\n\nYou can now create video components and launch Remotion Studio.`
         }
       ]
     };
@@ -373,7 +373,7 @@ async function handleSetupEnvironment(customPath?: string) {
       content: [
         {
           type: 'text',
-          text: `❌ Setup failed: ${error instanceof Error ? error.message : String(error)}\n\nEnsure Node.js and npm are properly installed and accessible.`
+          text: `[ERROR] Setup failed: ${error instanceof Error ? error.message : String(error)}\n\nEnsure Node.js and npm are properly installed and accessible.`
         }
       ]
     };
@@ -500,7 +500,7 @@ export const MyComposition: React.FC = () => {
 				opacity,
 			}}
 		>
-			Hello from Claude! 🎬
+			Hello from Claude! [VIDEO]
 		</AbsoluteFill>
 	);
 };`;
@@ -596,7 +596,7 @@ async function handleLaunchStudio(port = 3000) {
     
     if (!isInstalled) {
       const setupResult = await handleSetupEnvironment(undefined);
-      if (setupResult.content[0].text.includes('❌')) {
+      if (setupResult.content[0].text.includes('[ERROR]')) {
         return setupResult;
       }
     }
@@ -608,7 +608,7 @@ async function handleLaunchStudio(port = 3000) {
         content: [
           {
             type: 'text',
-            text: `❌ Port ${port} is already in use\n\nTroubleshooting:\n• Stop other applications using port ${port}\n• Try a different port: launch_remotion_studio --port=3001\n• On Windows: netstat -ano | findstr :${port}\n• On macOS/Linux: lsof -ti:${port} | xargs kill -9`
+            text: `[ERROR] Port ${port} is already in use\n\nTroubleshooting:\n• Stop other applications using port ${port}\n• Try a different port: launch_remotion_studio --port=3001\n• On Windows: netstat -ano | findstr :${port}\n• On macOS/Linux: lsof -ti:${port} | xargs kill -9`
           }
         ]
       };
@@ -655,12 +655,12 @@ async function handleLaunchStudio(port = 3000) {
         content: [
           {
             type: 'text',
-            text: `🚀 Remotion Studio launched successfully!\n\nURL: http://localhost:${port}\nPort: ${port}\nPID: ${studio.pid}\n\n✨ Access your video creation studio at: http://localhost:${port}`
+            text: `[LAUNCH] Remotion Studio launched successfully!\n\nURL: http://localhost:${port}\nPort: ${port}\nPID: ${studio.pid}\n\nAccess your video creation studio at: http://localhost:${port}`
           }
         ]
       };
     } else {
-      let errorText = `❌ Failed to launch Remotion Studio\n\nError: ${(result as any).error}\n\n`;
+      let errorText = `[ERROR] Failed to launch Remotion Studio\n\nError: ${(result as any).error}\n\n`;
       
       if ((result as any).troubleshooting) {
         errorText += `Troubleshooting steps:\n`;
@@ -814,7 +814,7 @@ function handleLaunchError(error: any, port: number) {
       content: [
         {
           type: 'text',
-          text: `❌ Node.js, npm, or npx not found\n\nTroubleshooting:\n• Ensure Node.js is installed and added to your system PATH\n• Restart your terminal or IDE after installing Node.js\n• Visit https://nodejs.org for installation instructions\n• Try running: node --version && npm --version && npx --version`
+          text: `[ERROR] Node.js, npm, or npx not found\n\nTroubleshooting:\n• Ensure Node.js is installed and added to your system PATH\n• Restart your terminal or IDE after installing Node.js\n• Visit https://nodejs.org for installation instructions\n• Try running: node --version && npm --version && npx --version`
         }
       ]
     };
@@ -825,7 +825,7 @@ function handleLaunchError(error: any, port: number) {
       content: [
         {
           type: 'text',
-          text: `❌ Unable to spawn Remotion Studio process\n\nTroubleshooting:\n• PATH environment variable issue detected\n• Restart Claude Desktop after installing Node.js\n• Ensure npx is accessible from command line\n• Try restarting your computer if recently installed Node.js`
+          text: `[ERROR] Unable to spawn Remotion Studio process\n\nTroubleshooting:\n• PATH environment variable issue detected\n• Restart Claude Desktop after installing Node.js\n• Ensure npx is accessible from command line\n• Try restarting your computer if recently installed Node.js`
         }
       ]
     };
@@ -835,7 +835,7 @@ function handleLaunchError(error: any, port: number) {
     content: [
       {
         type: 'text',
-        text: `❌ Unexpected error: ${error.message}\n\nTroubleshooting:\n• Check the console output for more details\n• Ensure Remotion project is properly set up\n• Try manual installation: npm install && npx remotion studio\n• Report this issue if problem persists`
+        text: `[ERROR] Unexpected error: ${error.message}\n\nTroubleshooting:\n• Check the console output for more details\n• Ensure Remotion project is properly set up\n• Try manual installation: npm install && npx remotion studio\n• Report this issue if problem persists`
       }
     ]
   };
@@ -882,7 +882,7 @@ async function main() {
   await server.connect(transport);
   
   // Log startup to stderr (won't interfere with MCP protocol)
-  console.error('🎬 Universal Remotion MCP Server v3.1.0 started');
+  console.error('[VIDEO] Universal Remotion MCP Server v3.1.0 started');
   console.error(`Platform: ${os.type()} ${os.arch()}`);
   console.error(`Node.js: ${process.version}`);
   console.error('Ready for video creation requests...');

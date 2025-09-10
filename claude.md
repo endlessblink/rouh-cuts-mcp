@@ -1,4 +1,7 @@
 Never build in wsl2 or ws2 for this project, ALWAYS in windows, Never create wsl2 paths
+Only build on windows, never wsl. never add wsl paths. 
+
+
 
 # CRITICAL: Evidence-Based Development Rules
 
