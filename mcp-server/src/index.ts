@@ -357,7 +357,7 @@ class RoughCutsMCPServer {
           content: [
             {
               type: 'text',
-              text: `Environment Status Report:\n\n❌ Missing: ${missing.join(', ')}\n\nPlatform: ${results.platform}\n\nSuggestions:\n- Install Node.js from https://nodejs.org/\n- Ensure Node.js is in your PATH\n- Try running commands in a new terminal session`,
+              text: `Environment Status Report:\n\n[ERROR] Missing: ${missing.join(', ')}\n\nPlatform: ${results.platform}\n\nSuggestions:\n- Install Node.js from https://nodejs.org/\n- Ensure Node.js is in your PATH\n- Try running commands in a new terminal session`,
             },
           ],
         };
@@ -809,12 +809,12 @@ registerRoot(RemotionRoot);`;
         return {
           content: [{
             type: 'text',
-            text: `🚀 ${result.message}\n\nURL: ${result.url}\n✅ Environment compatibility verified\n✅ Server is ready and responding\n\nThe studio is now running with Node.js v22 compatibility fixes applied.`
+            text: `[LAUNCH] ${result.message}\n\nURL: ${result.url}\n[OK] Environment compatibility verified\n[OK] Server is ready and responding\n\nThe studio is now running with Node.js v22 compatibility fixes applied.`
           }]
         };
       } else {
         // Provide enhanced error message with auto-fix suggestions
-        let errorText = `❌ Studio launch failed: ${result.message}`;
+        let errorText = `[ERROR] Studio launch failed: ${result.message}`;
         
         if (result.error) {
           errorText += `\n\nError details: ${result.error}`;
@@ -822,11 +822,11 @@ registerRoot(RemotionRoot);`;
         
         // Specific suggestions based on error type
         if (result.error?.includes('require is not defined')) {
-          errorText += '\n\n💡 This is a Node.js v22 compatibility issue. Try:\n• diagnose_remotion_error - Check environment\n• auto_fix_remotion_environment - Apply automatic fixes';
+          errorText += '\n\n[TIP] This is a Node.js v22 compatibility issue. Try:\n• diagnose_remotion_error - Check environment\n• auto_fix_remotion_environment - Apply automatic fixes';
         } else if (result.error?.includes('Port') && result.error?.includes('use')) {
-          errorText += `\n\n💡 Port ${port} is busy. Try:\n• Use a different port (3001, 3002, etc.)\n• Stop other applications using this port`;
+          errorText += `\n\n[TIP] Port ${port} is busy. Try:\n• Use a different port (3001, 3002, etc.)\n• Stop other applications using this port`;
         } else {
-          errorText += '\n\n💡 General troubleshooting:\n• Run diagnose_remotion_error first\n• Check Node.js installation\n• Verify project permissions';
+          errorText += '\n\n[TIP] General troubleshooting:\n• Run diagnose_remotion_error first\n• Check Node.js installation\n• Verify project permissions';
         }
         
         return {
@@ -842,7 +842,7 @@ registerRoot(RemotionRoot);`;
       return {
         content: [{
           type: 'text',
-          text: `❌ Studio launch failed: ${(error as Error).message}\n\n💡 Try running auto_fix_remotion_environment to resolve Node.js v22 compatibility issues`
+          text: `[ERROR] Studio launch failed: ${(error as Error).message}\n\n[TIP] Try running auto_fix_remotion_environment to resolve Node.js v22 compatibility issues`
         }]
       };
     }
@@ -1115,14 +1115,14 @@ registerRoot(RemotionRoot);`;
 
   private async getAnimationGuidelines(type: string = 'essential-rules') {
     const guidelines: Record<string, string> = {
-      'essential-rules': `🎬 ESSENTIAL ANIMATION RULES (MANDATORY):
+      'essential-rules': `ESSENTIAL ANIMATION RULES (MANDATORY):
 
-✅ **OVERLAPPING SCENES** - No empty screen time (15-frame overlaps)
-✅ **MOVEMENT + FADES** - Never fade-only transitions  
-✅ **QUICK TIMING** - 20-frame entries, 15-frame exits, 5-8 frame staggers
-✅ **PROPER SIZING** - 16px+ text, 18px+ badges, 20px+ buttons, 44px+ touch targets
-✅ **SAFE INTERPOLATION** - Always use bounds checking
-✅ **CUBIC EASING** - out for entries, in for exits
+[RULE] **OVERLAPPING SCENES** - No empty screen time (15-frame overlaps)
+[RULE] **MOVEMENT + FADES** - Never fade-only transitions  
+[RULE] **QUICK TIMING** - 20-frame entries, 15-frame exits, 5-8 frame staggers
+[RULE] **PROPER SIZING** - 16px+ text, 18px+ badges, 20px+ buttons, 44px+ touch targets
+[RULE] **SAFE INTERPOLATION** - Always use bounds checking
+[RULE] **CUBIC EASING** - out for entries, in for exits
 
 Timeline Formula (10-second animation):
 - Scene 1: 0-80 frames    (0-2.7s)
@@ -1131,13 +1131,13 @@ Timeline Formula (10-second animation):
 - Scene 4: 215-300 frames (7.2-10s)  - 15 frame overlap
 
 BANNED PATTERNS:
-❌ Empty screen time - Always overlap scenes
-❌ Fade-only transitions - Always combine with movement
-❌ Slow timing - Use 15-20 frame transitions max
-❌ Small text - 16px+ text, 44px+ touch targets
-❌ Hard cuts - Always use overlapping opacity transitions`,
+[X] Empty screen time - Always overlap scenes
+[X] Fade-only transitions - Always combine with movement
+[X] Slow timing - Use 15-20 frame transitions max
+[X] Small text - 16px+ text, 44px+ touch targets
+[X] Hard cuts - Always use overlapping opacity transitions`,
 
-      'safe-patterns': `🔧 SAFE ANIMATION PATTERNS:
+      'safe-patterns': `SAFE ANIMATION PATTERNS:
 
 const safeInterpolate = (frame: number, inputRange: [number, number], outputRange: [number, number], easing?: any) => {
   const [inputStart, inputEnd] = inputRange;
@@ -1160,7 +1160,7 @@ const animations = {
 // Always check visibility before rendering
 {sceneVisibility.scene1 > 0.01 && <Scene1Content />}`,
 
-      'professional-template': `🎯 PROFESSIONAL ANIMATION TEMPLATE:
+      'professional-template': `PROFESSIONAL ANIMATION TEMPLATE:
 
 import React from 'react';
 import { AbsoluteFill, useCurrentFrame, interpolate, Easing } from 'remotion';
@@ -1200,15 +1200,15 @@ export const ProfessionalAnimation: React.FC = () => {
   );
 };`,
 
-      'all': `🎬 Complete Animation Guidelines:
+      'all': `Complete Animation Guidelines:
 
 ESSENTIAL RULES:
-✅ Overlapping scenes (15-frame overlaps)
-✅ Movement + fades (never fade-only)
-✅ Quick timing (20-frame entries, 15-frame exits)
-✅ Proper sizing (16px+ text, 44px+ targets)
-✅ Safe interpolation (bounds checking)
-✅ Cubic easing (out for entries, in for exits)
+[OK] Overlapping scenes (15-frame overlaps)
+[OK] Movement + fades (never fade-only)
+[OK] Quick timing (20-frame entries, 15-frame exits)
+[OK] Proper sizing (16px+ text, 44px+ targets)
+[OK] Safe interpolation (bounds checking)
+[OK] Cubic easing (out for entries, in for exits)
 
 SAFE INTERPOLATION FUNCTION:
 const safeInterpolate = (frame, inputRange, outputRange, easing) => {
@@ -1234,7 +1234,7 @@ Always follow these patterns for professional results!`
         content: [
           {
             type: 'text',
-            text: `❌ Unknown guideline type: "${type}"\n\nAvailable types:\n• essential-rules\n• safe-patterns\n• professional-template\n• all`,
+            text: `[ERROR] Unknown guideline type: "${type}"\n\nAvailable types:\n• essential-rules\n• safe-patterns\n• professional-template\n• all`,
           },
         ],
       };
@@ -1256,7 +1256,7 @@ Always follow these patterns for professional results!`
         content: [
           {
             type: 'text',
-            text: '❌ filename is required',
+            text: '[ERROR] filename is required',
           },
         ],
       };
@@ -1274,7 +1274,7 @@ Always follow these patterns for professional results!`
           content: [
             {
               type: 'text',
-              text: `❌ Guidelines directory not found at: ${guidelinesDir}\n\nTry reinstalling the rough-cuts-mcp package.`,
+              text: `[ERROR] Guidelines directory not found at: ${guidelinesDir}\n\nTry reinstalling the rough-cuts-mcp package.`,
             },
           ],
         };
@@ -1289,7 +1289,7 @@ Always follow these patterns for professional results!`
           content: [
             {
               type: 'text',
-              text: `❌ Guidelines file "${filename}" not found.\n\n📁 Available files:\n${mdFiles.map(file => `• ${file}`).join('\n')}\n\nDirectory: ${guidelinesDir}`,
+              text: `[ERROR] Guidelines file "${filename}" not found.\n\nAvailable files:\n${mdFiles.map(file => `• ${file}`).join('\n')}\n\nDirectory: ${guidelinesDir}`,
             },
           ],
         };
@@ -1311,14 +1311,14 @@ Always follow these patterns for professional results!`
         content: [
           {
             type: 'text',
-            text: `❌ Failed to read guidelines file: ${(error as Error).message}`,
+            text: `[ERROR] Failed to read guidelines file: ${(error as Error).message}`,
           },
         ],
       };
     }
   }
 
-  // 🔥 NEW: Auto-repair Root.tsx corruption
+  // NEW: Auto-repair Root.tsx corruption
   private async autoRepairRoot(): Promise<any> {
     try {
       const result = await this.rootTsxManager.repairRootTsx();
@@ -1327,37 +1327,37 @@ Always follow these patterns for professional results!`
         content: [{
           type: 'text',
           text: result.success 
-            ? `✅ ${result.message}`
-            : `❌ ${result.message}`
+            ? `[OK] ${result.message}`
+            : `[ERROR] ${result.message}`
         }]
       };
     } catch (error) {
       return {
         content: [{
           type: 'text',
-          text: `❌ Auto-repair failed: ${(error as Error).message}`
+          text: `[ERROR] Auto-repair failed: ${(error as Error).message}`
         }]
       };
     }
   }
 
-  // 🔥 NEW: Validate Root.tsx health and detect corruption
+  // NEW: Validate Root.tsx health and detect corruption
   private async validateRootTsx(): Promise<any> {
     try {
       const validation = await this.rootTsxManager.validateRootTsx();
       
-      let status = validation.isHealthy ? '✅ Root.tsx is healthy' : '🚨 Root.tsx has issues';
+      let status = validation.isHealthy ? '[OK] Root.tsx is healthy' : '[ALERT] Root.tsx has issues';
       let issuesText = validation.issues.length > 0 
-        ? `\n\n⚠️ Issues found:\n${validation.issues.map(issue => `• ${issue}`).join('\n')}`
+        ? `\n\n[WARNING] Issues found:\n${validation.issues.map(issue => `• ${issue}`).join('\n')}`
         : '';
       let suggestion = !validation.isHealthy 
-        ? '\n\n💡 Run auto_repair_root to fix automatically' 
+        ? '\n\n[TIP] Run auto_repair_root to fix automatically' 
         : '';
 
       return {
         content: [{
           type: 'text',
-          text: `${status}\n\n📊 Components found: ${validation.componentsFound}${issuesText}${suggestion}`
+          text: `${status}\n\n[STATS] Components found: ${validation.componentsFound}${issuesText}${suggestion}`
         }]
       };
       
@@ -1365,13 +1365,13 @@ Always follow these patterns for professional results!`
       return {
         content: [{
           type: 'text',
-          text: `❌ Validation failed: ${(error as Error).message}`
+          text: `[ERROR] Validation failed: ${(error as Error).message}`
         }]
       };
     }
   }
 
-  // 🔥 NEW: MCP Tool - Non-Interactive Video Rendering with Smart Composition Creation
+  // NEW: MCP Tool - Non-Interactive Video Rendering with Smart Composition Creation
   private async renderVideoNonInteractive(compositionId: string, outputPath?: string): Promise<any> {
     try {
       const projectPath = path.join(os.homedir(), '.claude-videos', 'remotion-workspace');
@@ -1381,19 +1381,19 @@ Always follow these patterns for professional results!`
         return {
           content: [{
             type: 'text',
-            text: '❌ Remotion workspace not found. Run setup_remotion_environment first.'
+            text: '[ERROR] Remotion workspace not found. Run setup_remotion_environment first.'
           }]
         };
       }
 
-      // 🎯 Note: Composition auto-creation available in future version
+      // Note: Composition auto-creation available in future version
 
       const npxPath = await this.findExecutable('npx');
       if (!npxPath) {
         return {
           content: [{
             type: 'text',
-            text: '❌ npx not found. Please install Node.js.'
+            text: '[ERROR] npx not found. Please install Node.js.'
           }]
         };
       }
@@ -1450,19 +1450,19 @@ Always follow these patterns for professional results!`
             resolve({
               content: [{
                 type: 'text',
-                text: `✅ Video rendered successfully!\n\n📹 Output: ${outputFile}\n📊 Size: ${fileSize}\n🎯 Composition: ${compositionId}\n\nThe video has been saved to the output directory and is ready for use.`
+                text: `[OK] Video rendered successfully!\n\n[VIDEO] Output: ${outputFile}\n[STATS] Size: ${fileSize}\n[TARGET] Composition: ${compositionId}\n\nThe video has been saved to the output directory and is ready for use.`
               }]
             });
           } else {
             // Handle common render errors
-            let errorMessage = `❌ Render failed (exit code: ${code})`;
+            let errorMessage = `[ERROR] Render failed (exit code: ${code})`;
             
             if (stderr.includes('Composition') && stderr.includes('not found')) {
-              errorMessage += `\n\n💡 Composition "${compositionId}" not found. Available compositions:\n• Try 'Main' (default)\n• Check list_components for available compositions\n• Ensure components are properly registered in Root.tsx`;
+              errorMessage += `\n\n[TIP] Composition "${compositionId}" not found. Available compositions:\n• Try 'Main' (default)\n• Check list_components for available compositions\n• Ensure components are properly registered in Root.tsx`;
             } else if (stderr.includes('ENOENT')) {
-              errorMessage += '\n\n💡 File not found error. Try running setup_remotion_environment first.';
+              errorMessage += '\n\n[TIP] File not found error. Try running setup_remotion_environment first.';
             } else if (stderr.includes('memory')) {
-              errorMessage += '\n\n💡 Out of memory. Try reducing video resolution or duration.';
+              errorMessage += '\n\n[TIP] Out of memory. Try reducing video resolution or duration.';
             } else if (stderr) {
               errorMessage += `\n\nError details: ${stderr}`;
             }
@@ -1480,7 +1480,7 @@ Always follow these patterns for professional results!`
           resolve({
             content: [{
               type: 'text',
-              text: `❌ Failed to start render process: ${error.message}`
+              text: `[ERROR] Failed to start render process: ${error.message}`
             }]
           });
         });
@@ -1491,7 +1491,7 @@ Always follow these patterns for professional results!`
           resolve({
             content: [{
               type: 'text',
-              text: '❌ Render timeout after 10 minutes. Try reducing video complexity or duration.'
+              text: '[ERROR] Render timeout after 10 minutes. Try reducing video complexity or duration.'
             }]
           });
         }, 600000);
@@ -1501,33 +1501,33 @@ Always follow these patterns for professional results!`
       return {
         content: [{
           type: 'text',
-          text: `❌ Render setup failed: ${(error as Error).message}`
+          text: `[ERROR] Render setup failed: ${(error as Error).message}`
         }]
       };
     }
   }
 
-  // 🔥 NEW: MCP Tool - Diagnose Remotion Environment Issues
+  // NEW: MCP Tool - Diagnose Remotion Environment Issues
   private async diagnoseRemotionError(): Promise<any> {
     try {
       const diagnostic = await this.environmentFixer.diagnoseRemotionError();
       
       let statusText = diagnostic.success 
-        ? '✅ Environment is healthy for Node.js v22 compatibility'
-        : '🚨 Environment compatibility issues detected';
+        ? '[OK] Environment is healthy for Node.js v22 compatibility'
+        : '[ALERT] Environment compatibility issues detected';
       
       let issuesText = diagnostic.issues.length > 0
-        ? `\n\n⚠️ Issues found:\n${diagnostic.issues.map(issue => `• ${issue}`).join('\n')}`
+        ? `\n\n[WARNING] Issues found:\n${diagnostic.issues.map(issue => `• ${issue}`).join('\n')}`
         : '';
         
       let fixesText = diagnostic.fixes.length > 0
-        ? `\n\n💡 Recommended fixes:\n${diagnostic.fixes.map(fix => `• ${fix}`).join('\n')}`
+        ? `\n\n[TIP] Recommended fixes:\n${diagnostic.fixes.map(fix => `• ${fix}`).join('\n')}`
         : '';
         
-      let envInfo = `\n\n📊 Environment:\n• Node.js: ${diagnostic.nodeVersion}\n• Platform: ${diagnostic.platform}`;
+      let envInfo = `\n\n[STATS] Environment:\n• Node.js: ${diagnostic.nodeVersion}\n• Platform: ${diagnostic.platform}`;
       
       let suggestion = !diagnostic.success
-        ? '\n\n🛠️ Run auto_fix_remotion_environment to apply fixes automatically'
+        ? '\n\n[FIX] Run auto_fix_remotion_environment to apply fixes automatically'
         : '';
 
       return {
@@ -1540,32 +1540,32 @@ Always follow these patterns for professional results!`
       return {
         content: [{
           type: 'text',
-          text: `❌ Diagnostics failed: ${(error as Error).message}`
+          text: `[ERROR] Diagnostics failed: ${(error as Error).message}`
         }]
       };
     }
   }
 
-  // 🔥 NEW: MCP Tool - Auto-Fix Remotion Environment
+  // NEW: MCP Tool - Auto-Fix Remotion Environment
   private async autoFixRemotionEnvironment(): Promise<any> {
     try {
       const result = await this.environmentFixer.autoFixRemotionEnvironment();
       
       let statusText = result.success
-        ? '✅ Environment automatically fixed for Node.js v22 compatibility'
-        : '❌ Auto-fix encountered issues';
+        ? '[OK] Environment automatically fixed for Node.js v22 compatibility'
+        : '[ERROR] Auto-fix encountered issues';
         
       let actionsText = result.actions.length > 0
-        ? `\n\n🔧 Actions performed:\n${result.actions.map(action => `• ${action}`).join('\n')}`
+        ? `\n\n[ACTIONS] Actions performed:\n${result.actions.map(action => `• ${action}`).join('\n')}`
         : '';
         
       let errorText = result.error
-        ? `\n\n❌ Error: ${result.error}`
+        ? `\n\n[ERROR] Error: ${result.error}`
         : '';
         
       let nextSteps = result.success
-        ? '\n\n🚀 Next steps:\n• Dependencies may need reinstalling: npm install\n• Try launching Remotion Studio again\n• "require is not defined" errors should be resolved'
-        : '\n\n🔍 Manual intervention may be required';
+        ? '\n\n[NEXT] Next steps:\n• Dependencies may need reinstalling: npm install\n• Try launching Remotion Studio again\n• "require is not defined" errors should be resolved'
+        : '\n\n[INFO] Manual intervention may be required';
 
       return {
         content: [{
@@ -1577,7 +1577,7 @@ Always follow these patterns for professional results!`
       return {
         content: [{
           type: 'text',
-          text: `❌ Auto-fix failed: ${(error as Error).message}\n\n💡 Try running diagnose_remotion_error first to identify specific issues`
+          text: `[ERROR] Auto-fix failed: ${(error as Error).message}\n\n[TIP] Try running diagnose_remotion_error first to identify specific issues`
         }]
       };
     }

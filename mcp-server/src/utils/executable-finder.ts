@@ -16,6 +16,7 @@ export interface ExecutableLocation {
 
 /**
  * Find executable across all platforms with fallback to common installation paths
+ * Optimized for Windows with proper spaces-in-path handling
  */
 export function findExecutable(command: string): ExecutableLocation {
   const isWindows = process.platform === 'win32';
@@ -68,6 +69,7 @@ export function findExecutable(command: string): ExecutableLocation {
   throw new Error(`${command} not found in PATH or common installation locations. Please ensure ${command} is installed and accessible.`);
 }
 
+
 function getCommonPaths(command: string): string[] {
   const isWindows = process.platform === 'win32';
   const isMac = process.platform === 'darwin';
@@ -104,6 +106,7 @@ function getCommonPaths(command: string): string[] {
 
 function getVersion(executablePath: string, command: string): string | undefined {
   try {
+    // Use quoted paths to handle spaces in Windows Program Files
     const result = execSync(`"${executablePath}" --version`, {
       encoding: 'utf8',
       timeout: 3000,
