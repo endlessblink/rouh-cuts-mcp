@@ -15,17 +15,21 @@ import os from 'os';
 
 // 🔥 CRITICAL FIX: Import and use the existing UniversalNodeDetector
 import { UniversalNodeDetector } from './universal-node-detector.js';
+// 🔥 NEW: Import Root.tsx corruption prevention system
+import { RootTsxManager } from './utils/root-tsx-manager.js';
 
 class RoughCutsMCPServer {
   private server: Server;
   // 🔥 FIXED: Initialize the UniversalNodeDetector that already exists
   private nodeDetector: UniversalNodeDetector;
+  // 🔥 NEW: Root.tsx corruption prevention manager
+  private rootTsxManager: RootTsxManager;
 
   constructor() {
     this.server = new Server(
       {
         name: 'rough-cuts-mcp',
-        version: '4.2.0',
+        version: '4.3.0',
       },
       {
         capabilities: {
@@ -36,6 +40,10 @@ class RoughCutsMCPServer {
 
     // 🚀 INTEGRATION FIX: Use the UniversalNodeDetector with debug enabled
     this.nodeDetector = new UniversalNodeDetector({ debug: true });
+    
+    // 🔥 NEW: Initialize Root.tsx manager with default workspace path
+    const workspacePath = path.join(os.homedir(), '.claude-videos', 'remotion-workspace');
+    this.rootTsxManager = new RootTsxManager(workspacePath);
     
     this.setupToolHandlers();
   }
@@ -175,6 +183,22 @@ class RoughCutsMCPServer {
             required: ['filename'],
           },
         },
+        {
+          name: 'auto_repair_root',
+          description: 'Automatically fix corrupted Root.tsx by scanning filesystem and regenerating clean content',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+          },
+        },
+        {
+          name: 'validate_root_tsx',
+          description: 'Check Root.tsx health and detect corruption patterns like duplicate imports and compositions',
+          inputSchema: {
+            type: 'object',
+            properties: {},
+          },
+        },
       ],
     }));
 
@@ -203,6 +227,10 @@ class RoughCutsMCPServer {
             return await this.getAnimationGuidelines((args as any)?.type || 'essential-rules');
           case 'read_guidelines_file':
             return await this.readGuidelinesFile((args as any)?.filename);
+          case 'auto_repair_root':
+            return await this.autoRepairRoot();
+          case 'validate_root_tsx':
+            return await this.validateRootTsx();
           default:
             throw new McpError(
               ErrorCode.MethodNotFound,
@@ -909,58 +937,41 @@ registerRoot(RemotionRoot);`;
         throw new Error('Component must have an export statement');
       }
 
-      // Create component file with cleaned code
-      const componentFile = path.join(componentsPath, `${componentNameStr}.tsx`);
-      await fs.writeFile(componentFile, cleanedCode);
-
-      // Update Root.tsx to include new component
-      const rootPath = path.join(projectPath, 'src', 'Root.tsx');
-      const frames = Math.floor(durationNum * 30); // 30 FPS
-
-      let rootContent = await fs.readFile(rootPath, 'utf8');
-      
-      // Add import
-      const importLine = `import {${componentNameStr}} from './components/${componentNameStr}';`;
-      if (!rootContent.includes(importLine)) {
-        rootContent = rootContent.replace(
-          /import.*from.*['"];/g,
-          (match) => `${match}\n${importLine}`
-        );
+      // 🔥 FIXED: Use RootTsxManager for corruption-safe component creation
+      try {
+        await this.rootTsxManager.addComponentSafely(componentNameStr, cleanedCode, {
+          duration: Math.floor(durationNum * 30), // Convert to frames
+          width: 1920,
+          height: 1080
+        });
+      } catch (rootError) {
+        // Auto-repair on Root.tsx corruption and retry once
+        this.nodeDetector.log('🔧 Component creation failed, attempting auto-repair...');
+        await this.rootTsxManager.repairRootTsx();
+        
+        // Retry component creation after repair
+        await this.rootTsxManager.addComponentSafely(componentNameStr, cleanedCode, {
+          duration: Math.floor(durationNum * 30),
+          width: 1920,
+          height: 1080
+        });
       }
-
-      // Add composition
-      const compositionElement = `      <Composition
-        id="${componentNameStr}"
-        component={${componentNameStr}}
-        durationInFrames={${frames}}
-        fps={30}
-        width={1920}
-        height={1080}
-      />`;
-
-      if (!rootContent.includes(`id="${componentNameStr}"`)) {
-        rootContent = rootContent.replace(
-          /(<Composition[\s\S]*?\/>)/g,
-          (match) => `${match}\n${compositionElement}`
-        );
-      }
-
-      await fs.writeFile(rootPath, rootContent);
 
       return {
         content: [
           {
             type: 'text',
-            text: `✅ Component "${componentNameStr}" created successfully!\n\nDuration: ${durationNum} seconds (${frames} frames)\nLocation: ${componentFile}\nRegistered: Added to Root.tsx\n\nFeatures applied:\n• Automatic syntax error repair\n• Import statement validation\n• Template literal fixes\n• Proper TypeScript exports\n\nNext steps:\n• Launch Remotion Studio to preview your component\n• The component is ready for rendering and editing`,
+            text: `✅ Component "${componentNameStr}" created successfully!\n\nDuration: ${durationNum} seconds (${Math.floor(durationNum * 30)} frames)\nLocation: ${this.rootTsxManager.getComponentsDir()}/${componentNameStr}.tsx\nRegistered: Added to Root.tsx with corruption prevention\n\nFeatures applied:\n• Automatic syntax error repair\n• Root.tsx corruption prevention\n• Atomic file operations\n• Duplicate detection and removal\n• Import/composition deduplication\n\nNext steps:\n• Launch Remotion Studio to preview your component\n• Component will load without undefined errors`,
           },
         ],
       };
     } catch (error) {
+      // If component creation fails completely, suggest auto-repair
       return {
         content: [
           {
             type: 'text',
-            text: `Failed to create component: ${(error as Error).message}`,
+            text: `❌ Failed to create component: ${(error as Error).message}\n\n💡 If this is a Root.tsx corruption issue, try:\n• auto_repair_root - Fix Root.tsx automatically\n• validate_root_tsx - Check for corruption patterns`,
           },
         ],
       };
@@ -1270,6 +1281,59 @@ Always follow these patterns for professional results!`
             text: `❌ Failed to read guidelines file: ${(error as Error).message}`,
           },
         ],
+      };
+    }
+  }
+
+  // 🔥 NEW: Auto-repair Root.tsx corruption
+  private async autoRepairRoot(): Promise<any> {
+    try {
+      const result = await this.rootTsxManager.repairRootTsx();
+      
+      return {
+        content: [{
+          type: 'text',
+          text: result.success 
+            ? `✅ ${result.message}`
+            : `❌ ${result.message}`
+        }]
+      };
+    } catch (error) {
+      return {
+        content: [{
+          type: 'text',
+          text: `❌ Auto-repair failed: ${(error as Error).message}`
+        }]
+      };
+    }
+  }
+
+  // 🔥 NEW: Validate Root.tsx health and detect corruption
+  private async validateRootTsx(): Promise<any> {
+    try {
+      const validation = await this.rootTsxManager.validateRootTsx();
+      
+      let status = validation.isHealthy ? '✅ Root.tsx is healthy' : '🚨 Root.tsx has issues';
+      let issuesText = validation.issues.length > 0 
+        ? `\n\n⚠️ Issues found:\n${validation.issues.map(issue => `• ${issue}`).join('\n')}`
+        : '';
+      let suggestion = !validation.isHealthy 
+        ? '\n\n💡 Run auto_repair_root to fix automatically' 
+        : '';
+
+      return {
+        content: [{
+          type: 'text',
+          text: `${status}\n\n📊 Components found: ${validation.componentsFound}${issuesText}${suggestion}`
+        }]
+      };
+      
+    } catch (error) {
+      return {
+        content: [{
+          type: 'text',
+          text: `❌ Validation failed: ${(error as Error).message}`
+        }]
       };
     }
   }

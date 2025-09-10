@@ -1,6 +1,6 @@
 {
   "name": "rough-cuts-mcp-server",
-  "version": "4.2.0",
+  "version": "4.3.0",
   "description": "Enhanced MCP Server for Remotion video generation with Claude Desktop - Complete Implementation",
   "type": "module",
   "main": "dist/index.js",
@@ -17,18 +17,26 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "fs-extra": "^11.1.1",
+    "write-file-atomic": "^6.0.0",
     "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^20.0.0",
-    "typescript": "^5.0.0",
-    "rimraf": "^5.0.0"
+    "@types/write-file-atomic": "^4.0.3",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
   },
-  "keywords": ["mcp", "remotion", "video", "claude", "ai"],
+  "keywords": [
+    "mcp",
+    "remotion",
+    "video",
+    "claude",
+    "ai"
+  ],
   "author": "Claude MCP Developer",
   "license": "MIT"
 }
